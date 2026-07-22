@@ -1,0 +1,26 @@
+CREATE EXTENSION pg_textsearch;
+
+CREATE TABLE genre(
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(255),
+    description TEXT
+);
+
+CREATE TABLE genre_hierarchy(
+    genre BIGINT REFERENCES genre(id) ON DELETE CASCADE,
+    parent BIGINT REFERENCES genre(id) ON DELETE CASCADE,
+    PRIMARY KEY (genre, parent)
+);
+
+CREATE TABLE instrument(
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(255),
+    description TEXT
+);
+
+
+CREATE TABLE instrument_genres(
+    instrument BIGINT REFERENCES instrument(id) ON DELETE CASCADE,
+    genre BIGINT REFERENCES genre(id) ON DELETE CASCADE,
+    PRIMARY KEY (instrument, genre)
+);
