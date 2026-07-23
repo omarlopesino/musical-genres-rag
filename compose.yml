@@ -11,7 +11,10 @@ services:
       - "5432:5432"
     volumes:
       - mgr_pgdata:/var/lib/postgresql
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      # Init scripts run in alphabetical order: schema, then seed data.
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./data/load.sql:/docker-entrypoint-initdb.d/02-load.sql
+      - ./data:/data:ro
 
 volumes:
   mgr_pgdata:
