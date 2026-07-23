@@ -7,6 +7,7 @@ space := $(empty) $(empty)
 DB_NAME = musical_genres
 
 setup:
+    uv sync
     docker compose down -v
     docker compose up -d
 
