@@ -22,18 +22,21 @@ class Index():
 
     def indexEntityBatch(self, entities):
         for entity in entities:
-            attributes = ['id']
-            params = [entity.getId()]
-            for key, embedder  in self.embedders.items():
-                attributes.append(key)
-                embedderInstance = embedder(entity)
-                params.append(embedderInstance.embed())
-            
-            query = sql.SQL('INSERT INTO {table} ({fields}) VALUES ({values})').format(
-                table = sql.Identifier(self.table),
-                fields = sql.SQL(',').join(sql.Identifier(attribute) for attribute in attributes),
-                values = sql.SQL(',').join(sql.Placeholder() for attribute in attributes)
-            )
+            self.indexDatabase(entity)
 
-            with self.database.query(query, params):
-                pass
+    def indexDatabase(self, entity):
+        attributes = ['id']
+        params = [entity.getId()]
+        for key, embedder  in self.embedders.items():
+            attributes.append(key)
+            embedderInstance = embedder(entity)
+            params.append(embedderInstance.embed())
+        
+        query = sql.SQL('INSERT INTO {table} ({fields}) VALUES ({values})').format(
+            table = sql.Identifier(self.table),
+            fields = sql.SQL(',').join(sql.Identifier(attribute) for attribute in attributes),
+            values = sql.SQL(',').join(sql.Placeholder() for attribute in attributes)
+        )
+
+        with self.database.query(query, params):
+            pass
