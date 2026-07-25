@@ -1,8 +1,8 @@
 services:
   db:
+    container_name: ${PROJECT_NAME}_db
     image: pgvector_textsearch
     build: ./
-    container_name: ${PROJECT_NAME}_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -15,6 +15,12 @@ services:
       - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./data/load.sql:/docker-entrypoint-initdb.d/02-load.sql
       - ./data:/data:ro
+
+  redis:
+    container_name: ${PROJECT_NAME}_redis
+    image: redis:8.8.1
+    ports:
+      - "6379:6379"
 
 volumes:
   mgr_pgdata:
