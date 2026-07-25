@@ -15,3 +15,7 @@ index = Index(database, table, grepo)
 def ingest():
     index.index()
 
+def rag():
+    query = 'guitar';
+    genresRag = GenresRag(grepo, index)
+    results = genresRag.query(query)
