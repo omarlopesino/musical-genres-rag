@@ -18,13 +18,13 @@ class Index():
             pass
 
         entities = self.entityRepository.loadMultiple()
-        self.indexEntityBatch(entities)
+        self._indexEntityBatch(entities)
 
-    def indexEntityBatch(self, entities):
+    def _indexEntityBatch(self, entities):
         for entity in entities:
-            self.indexDatabase(entity)
+            self._indexDatabase(entity)
 
-    def indexDatabase(self, entity):
+    def _indexDatabase(self, entity):
         attributes = ['id']
         params = [entity.getId()]
         for key, embedder  in self.embedders.items():
