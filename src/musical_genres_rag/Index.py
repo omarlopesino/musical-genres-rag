@@ -6,6 +6,7 @@ class Index():
     def __init__(self, database, table, entityRepository):
         self.database = database
         self.table = table
+        self.textIndex = table + '_text'
         self.entityRepository = entityRepository
         self.embedders = {
             'content': TextEmbedder
@@ -19,6 +20,17 @@ class Index():
 
         entities = self.entityRepository.loadMultiple()
         self._indexEntityBatch(entities)
+
+    def search(self, query, limit = 5):
+        # The bare "content <@> 'text'" form only resolves the index when the
+        # query is inlined, so name the index explicitly to use a placeholder.
+        sqlQuery = sql.SQL('SELECT id FROM {table} ORDER BY content <@> to_bm25query(%s, {index}) LIMIT {limit}').format(
+            table = sql.Identifier(self.table),
+            index = sql.Literal(self.textIndex),
+            limit = sql.Literal(limit)
+        )
+        with self.database.query(sqlQuery, [query]) as queryResult:
+            return [id for [id] in queryResult.fetchall()]
 
     def _indexEntityBatch(self, entities):
         for entity in entities:
