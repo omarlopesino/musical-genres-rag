@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mgr-cli = 'musical_genres_rag.cli:debug'
+debug = 'musical_genres_rag.debug:debug'
 
 [build-system]
 requires = ["hatchling"]

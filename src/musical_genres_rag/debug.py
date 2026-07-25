@@ -1,5 +1,6 @@
 from musical_genres_rag.Storage import Database
 from musical_genres_rag.Storage import Cache
+from musical_genres_rag.Renderer import EntityRenderer
 from musical_genres_rag.Repository import GenresRepository
 from musical_genres_rag.Model import Genre
 from dotenv import load_dotenv
@@ -8,6 +9,9 @@ import json
 load_dotenv()
 
 def debug():
+    pass
+
+def debugGenreRist():
     database = Database()
     cache = Cache()
     grepo = GenresRepository(database, cache)
