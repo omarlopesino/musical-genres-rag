@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 debug = 'musical_genres_rag.debug:debug'
+ingest = 'musical_genres_rag.ingest:ingest'
 
 [build-system]
 requires = ["hatchling"]
