@@ -1,4 +1,6 @@
 from musical_genres_rag.Renderer import EntityRenderer
+from openai import OpenAI
+import json
 
 INSTRUCTIONS = '''
 You are a music genre specialist. You objective is teaching user genres related with their request. You must answer first replying the genres found, and finally reply with the most relevant instruments.
@@ -15,6 +17,8 @@ CONTEXT:
 {context}
 '''.strip()
 
+MODEL = 'gpt-5.4-mini'
+
 class RagResponse:
 
     def __init__(self, query, response, entities):
@@ -23,6 +27,9 @@ class RagResponse:
         self.query = query
         self.response = response
         self.entities = entities
+
+    def getResponse(self):
+        return self.response
 
     def toJson(self):
         pass
@@ -34,13 +41,14 @@ class RagResponse:
 class GenresRagResponse(RagResponse):
 
     def toJson(self):
-        return {
+        dataDict = {
             'response': self.response,
-            'genres': [self._renderEntity(entity) for entity in entities],
-            'instruments': [self._renderEntity(entity) for entity in self._getInstrumentsFromGenres(entities)]
+            'genres': [self._renderEntity(entity) for entity in self.entities],
+            'instruments': [self._renderEntity(entity) for entity in self._getInstrumentsFromGenres(self.entities)]
         }
+        return json.dumps(dataDict)
 
-    def _getInstrumentsFromGenres(genres):
+    def _getInstrumentsFromGenres(self, genres):
         instruments = {}
         for genre in genres:
             for instrument in genre.getInstruments():
@@ -50,6 +58,7 @@ class GenresRagResponse(RagResponse):
 class Rag:
 
     def __init__(self, repository, index, responseClass):
+        self.llm = OpenAI()
         self.repository = repository
         self.index = index
         self.responseClass = responseClass
@@ -58,9 +67,8 @@ class Rag:
         results = self._queryIndex(query)
         entities = self.repository.loadMultiple(results)
         prompt = self._buildPrompt(query, entities)
-        print(prompt)
-        #llm_response = self._queryLlm(prompt)
-        #return responseClass(query, llm_response)
+        llm_response = self._queryLlm(prompt)
+        return self.responseClass(query, llm_response, entities)
 
     def _queryIndex(self, query):
         return self.index.search(query)
@@ -85,7 +93,7 @@ class Rag:
         ]
 
         response = self.llm.responses.create(
-            model=self.model,
+            model=MODEL,
             input=input_messages
         )
 

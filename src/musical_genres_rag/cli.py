@@ -18,4 +18,5 @@ def ingest():
 def rag():
     query = 'guitar';
     genresRag = GenresRag(grepo, index)
-    results = genresRag.query(query)
+    response = genresRag.query(query)
+    print(response.getResponse().output_text)
