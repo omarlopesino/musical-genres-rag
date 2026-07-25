@@ -11,6 +11,14 @@ load_dotenv()
 def debug():
     pass
 
+def debugRenderers():
+    database = Database()
+    cache = Cache()
+    grepo = GenresRepository(database, cache)
+    genre = grepo.load(1)
+    renderer = EntityRenderer(genre)
+    print(renderer.render())
+
 def debugGenreRist():
     database = Database()
     cache = Cache()
