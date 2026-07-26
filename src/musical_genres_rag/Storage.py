@@ -25,6 +25,18 @@ from contextlib import contextmanager
 """Provides a database connection"""
 class Database():
 
+    @contextmanager
+    def transaction(self):
+        pass
+
+    """Runs a query, with optional placeholder values as a sequence or a mapping"""
+    @contextmanager
+    def query(self, query, params = None):
+        pass
+
+"""Provides a database connection"""
+class PostgresDatabase(Database):
+
     """ Initializes database """
     def __init__(self):
         self.assertEnvironment()
