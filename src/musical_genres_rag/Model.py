@@ -12,7 +12,7 @@ class BaseModel():
         return self.name
 
     def getDescription(self):
-        return self.name
+        return self.description
 
 class Genre(BaseModel):
 
