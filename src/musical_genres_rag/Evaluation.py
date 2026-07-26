@@ -40,7 +40,7 @@ class GroundTruth:
         self.responseClass = responseClass
         self.llm = OpenAI()
 
-    def generate(self, outputPath = './reports/ground_truth/ground_truth.csv'):
+    def generate(self, outputPath = './tests/ground_truth/ground_truth.csv'):
         # @todo tqdm
         # @todo load all
         entities = self.repository.loadMultiple()
