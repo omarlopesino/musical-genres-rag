@@ -11,10 +11,14 @@ services:
       - "5432:5432"
     volumes:
       - mgr_pgdata:/var/lib/postgresql
-      # Init scripts run in alphabetical order: schema, then seed data.
-      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./data/load.sql:/docker-entrypoint-initdb.d/02-load.sql
+      # Django migrations own the schema now, so nothing runs at init. The CSVs stay
+      # mounted because load.sql COPYs them server-side, from inside this container.
       - ./data:/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d musical_genres"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
 
   redis:
     container_name: ${PROJECT_NAME}_redis

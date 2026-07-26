@@ -1,13 +1,14 @@
 
-from musical_genres_rag.Model import BaseModel
+from musical_genres_rag.models import EntityModel
 
 class Renderer():
 
     def __init__(self, entity):
         self.entity = entity
 
+    """Asks the entity for its properties: vars() on a model would leak _state and drop the relations"""
     def _getProperties(self):
-        return vars(self.entity)
+        return self.entity.getProperties()
 
     def render(self):
         pass
@@ -23,7 +24,7 @@ class TextRenderer(Renderer):
         return text
 
     def renderProperty(self, property, value):
-        if (isinstance(value, BaseModel)):
+        if (isinstance(value, EntityModel)):
             renderer = TextRenderer(value)
             rendered = renderer.render()
             finalValue = property + ":\n" + rendered
@@ -45,7 +46,7 @@ class JsonRenderer(Renderer):
         return jsonDict
 
     def renderProperty(self, property, value):
-        if (isinstance(value, BaseModel)):
+        if (isinstance(value, EntityModel)):
             renderer = JsonRenderer(value)
             rendered = renderer.render()
             finalValue = rendered

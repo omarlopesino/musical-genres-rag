@@ -1,3 +1,4 @@
+from django.db import connection
 from musical_genres_rag.Embed import TextEmbedder
 from psycopg import sql
 
@@ -22,8 +23,7 @@ class Index():
 
 class SearchEngine:
 
-    def __init__(self, database, embedders):
-        self.database = database
+    def __init__(self, embedders):
         self.embedders = embedders
 
     def clearContent(self):
@@ -43,8 +43,8 @@ class SearchEngine:
 
 class PostgresSearchEngine(SearchEngine):
 
-    def __init__(self, database, table, mode = 'text'):
-        super().__init__(database, self._getEmbedders(mode))
+    def __init__(self, table, mode = 'text'):
+        super().__init__(self._getEmbedders(mode))
         self.table = table
         self.textIndex = table + '_text'
 
@@ -64,13 +64,14 @@ class PostgresSearchEngine(SearchEngine):
             index = sql.Literal(self.textIndex),
             limit = sql.Literal(limit)
         )
-        with self.database.query(sqlQuery, [query]) as queryResult:
-            return [id for [id] in queryResult.fetchall()]
+        with connection.cursor() as cursor:
+            cursor.execute(sqlQuery, [query])
+            return [id for [id] in cursor.fetchall()]
 
     def clearContent(self):
         truncate = sql.SQL('TRUNCATE {table}').format(table = sql.Identifier(self.table))
-        with self.database.query(truncate):
-            pass
+        with connection.cursor() as cursor:
+            cursor.execute(truncate)
 
     def _doIndex(self, attributes, params):
         query = sql.SQL('INSERT INTO {table} ({fields}) VALUES ({values})').format(
@@ -79,5 +80,5 @@ class PostgresSearchEngine(SearchEngine):
             values = sql.SQL(',').join(sql.Placeholder() for attribute in attributes)
         )
 
-        with self.database.query(query, params):
-            pass
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)

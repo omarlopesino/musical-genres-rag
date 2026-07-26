@@ -2,101 +2,102 @@
 
 Classes under `src/musical_genres_rag`.
 
+Persistence is Django's: `models.py` holds the ORM models, connections come from
+`django.db`, and the schema lives in `migrations/`. `Repository` survives only as a
+thin ordering-preserving facade over the managers.
+
 ```mermaid
 classDiagram
     direction TB
 
-    namespace Model {
-        class BaseModel {
+    namespace models {
+        class EntityModel {
             +id
             +name
             +description
-            +__init__(id, name, description)
             +getId()
             +getName()
             +getDescription()
+            +getProperties()
         }
 
         class Genre {
-            +parents: Genre[]
-            +instruments: Instrument[]
-            +setInstruments(instruments)
-            +setParents(parents)
-            +getInstruments()
-            +getParents()
+            +parents: ManyToMany~Genre~
+            +instruments: ManyToMany~Instrument~
+            +getProperties()
         }
 
         class Instrument {
-        }
-    }
-
-    namespace Storage {
-        class Cache {
-            +redis: redis.Redis
-            +assertEnvironment()
-            +getValue(cid)
-            +setValue(cid, value)
+            +genres: ManyToMany~Genre~
         }
 
-        class Database {
-            +host
-            +port
-            +user
-            +password
-            +database
-            +connection
-            +assertEnvironment()
-            +getConnection()
-            +close()
-            +transaction()
-            +query(query, params)
-            -_runQuery(query, cursor, params)
+        class GenreHierarchy {
+            +genre: FK~Genre~
+            +parent: FK~Genre~
+        }
+
+        class InstrumentGenres {
+            +instrument: FK~Instrument~
+            +genre: FK~Genre~
+        }
+
+        class GenreIndex {
+            +id
+            +content
         }
     }
 
     namespace Repository {
         class RepositoryBase {
-            +table
-            +database: Database
-            +cache: Cache
-            +rows: dict
-            +ids: dict
+            +model
+            +prefetch
             +load(id)
             +loadMultiple(ids)
-            -_buildEntity(row)
-            -_queryRows(ids)
-            -_cacheId(id)
-            -_cachedRows(ids)
-            -_cachedIds(cid, query, params)
-            -_cacheRows(rows)
         }
 
         class InstrumentsRepository {
-            +__init__(database, cache)
-            -_buildEntity(entity)
         }
 
         class GenresRepository {
             +instrumentsRepository: InstrumentsRepository
-            +__init__(database, cache)
-            -_buildEntity(entity)
-            +loadGenreParents(genre)
-            +loadGenreInstruments(genre)
         }
     }
 
-    BaseModel <|-- Genre
-    BaseModel <|-- Instrument
+    class DjangoORM["django.db"] {
+        +connection
+        +Manager.prefetch_related()
+        +QuerySet.in_bulk()
+    }
+
+    EntityModel <|-- Genre
+    EntityModel <|-- Instrument
     RepositoryBase <|-- InstrumentsRepository
     RepositoryBase <|-- GenresRepository
 
     Genre "1" o-- "*" Genre : parents
     Genre "1" o-- "*" Instrument : instruments
+    GenreHierarchy ..> Genre : through
+    InstrumentGenres ..> Instrument : through
+    InstrumentGenres ..> Genre : through
 
-    RepositoryBase --> Database : queries
-    RepositoryBase --> Cache : caches rows and id lists
+    RepositoryBase --> DjangoORM : loads, prefetches, restores id order
     GenresRepository *-- InstrumentsRepository
 
-    InstrumentsRepository ..> Instrument : builds
-    GenresRepository ..> Genre : builds
+    InstrumentsRepository ..> Instrument : loads
+    GenresRepository ..> Genre : loads
 ```
+
+## Entry points
+
+The `uv` scripts became `manage.py` subcommands, wired through `services.py`:
+
+| Command | Does |
+|---|---|
+| `manage.py ingest` | Rebuilds `genre_index` from every stored genre |
+| `manage.py rag [question]` | Answers a question from the indexed context |
+| `manage.py groundtruth [--output]` | Regenerates the ground truth question set |
+| `manage.py debug [--mode]` | `renderers`, `genres` or `queries` inspection |
+
+`PostgresSearchEngine` still issues raw SQL through `django.db.connection`: the bm25
+operator (`content <@> to_bm25query(...)`) has no ORM expression, and the same will be
+true of the hybrid query once a pgvector column is added.
