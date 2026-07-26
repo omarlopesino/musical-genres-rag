@@ -17,6 +17,7 @@ dependencies = [
 debug = 'musical_genres_rag.debug:debug'
 ingest = 'musical_genres_rag.cli:ingest'
 rag = 'musical_genres_rag.cli:rag'
+groundTruth = 'musical_genres_rag.cli:groundTruth'
 
 [build-system]
 requires = ["hatchling"]
