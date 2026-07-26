@@ -16,7 +16,7 @@ def ingest():
     index.index()
 
 def rag():
-    query = 'guitar';
+    query = 'What genres could be good If I like electronic music and a lot of drums?';
     genresRag = GenresRag(grepo, index)
     response = genresRag.query(query)
     print(response.getResponse().output_text)
