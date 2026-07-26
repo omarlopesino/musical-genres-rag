@@ -165,6 +165,7 @@ dependencies = [
     { name = "dotenv" },
     { name = "openai" },
     { name = "psycopg" },
+    { name = "pydantic" },
     { name = "redis" },
 ]
 
@@ -173,6 +174,7 @@ requires-dist = [
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "openai", specifier = ">=2.48.0" },
     { name = "psycopg", specifier = ">=3.3.4" },
+    { name = "pydantic", specifier = ">=2.13.4" },
     { name = "redis", specifier = ">=8.0.1" },
 ]
 
