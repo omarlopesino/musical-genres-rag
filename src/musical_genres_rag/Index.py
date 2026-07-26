@@ -3,23 +3,58 @@ from psycopg import sql
 
 class Index():
 
-    def __init__(self, database, table, entityRepository):
-        self.database = database
-        self.table = table
-        self.textIndex = table + '_text'
+    def __init__(self, searchEngine, entityRepository):
+        self.searchEngine = searchEngine
         self.entityRepository = entityRepository
-        self.embedders = {
-            'content': TextEmbedder
-        }
 
     def index(self):
-        # @todo improve to make it paralelly!
-        truncate = sql.SQL('TRUNCATE {table}').format(table = sql.Identifier(self.table))
-        with self.database.query(truncate):
-            pass
-
+        self.searchEngine.clearContent()
         entities = self.entityRepository.loadMultiple()
+        # @todo improve to make it paralelly!
         self._indexEntityBatch(entities)
+
+    def search(self, query, limit = 5):
+        return self.searchEngine.search(query, limit)
+
+    def _indexEntityBatch(self, entities):
+        for entity in entities:
+            self.searchEngine.indexEntity(entity)
+
+class SearchEngine:
+
+    def __init__(self, database, embedders):
+        self.database = database
+        self.embedders = embedders
+
+    def clearContent(self):
+        pass
+
+    def indexEntity(self, entity):
+        attributes = ['id']
+        params = [entity.getId()]
+        for key, embedder  in self.embedders.items():
+            attributes.append(key)
+            embedderInstance = embedder(entity)
+            params.append(embedderInstance.embed())
+        self._doIndex(attributes, params)
+
+    def _doIndex(self, attributes, params):
+        pass
+
+class PostgresSearchEngine(SearchEngine):
+
+    def __init__(self, database, table, mode = 'text'):
+        super().__init__(database, self._getEmbedders(mode))
+        self.table = table
+        self.textIndex = table + '_text'
+
+    def _getEmbedders(self, mode):
+        embedders = {}
+        match mode:
+            case 'text' | _:
+                embedders['content'] = TextEmbedder
+
+        return embedders
 
     def search(self, query, limit = 5):
         # The bare "content <@> 'text'" form only resolves the index when the
@@ -32,18 +67,12 @@ class Index():
         with self.database.query(sqlQuery, [query]) as queryResult:
             return [id for [id] in queryResult.fetchall()]
 
-    def _indexEntityBatch(self, entities):
-        for entity in entities:
-            self._indexDatabase(entity)
+    def clearContent(self):
+        truncate = sql.SQL('TRUNCATE {table}').format(table = sql.Identifier(self.table))
+        with self.database.query(truncate):
+            pass
 
-    def _indexDatabase(self, entity):
-        attributes = ['id']
-        params = [entity.getId()]
-        for key, embedder  in self.embedders.items():
-            attributes.append(key)
-            embedderInstance = embedder(entity)
-            params.append(embedderInstance.embed())
-        
+    def _doIndex(self, attributes, params):
         query = sql.SQL('INSERT INTO {table} ({fields}) VALUES ({values})').format(
             table = sql.Identifier(self.table),
             fields = sql.SQL(',').join(sql.Identifier(attribute) for attribute in attributes),
