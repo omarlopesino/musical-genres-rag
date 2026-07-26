@@ -1,4 +1,6 @@
 from musical_genres_rag.Renderer import EntityRenderer
+from typing import List
+from pydantic import BaseModel, Field
 from openai import OpenAI
 import json
 
@@ -24,39 +26,36 @@ MODEL = 'gpt-5.4-mini'
 
 class RagResponse:
 
-    def __init__(self, query, response, entities):
-        # @todo receive a wrapped response class to render a json
-        # with only the response.
+    def __init__(self, query, response):
+        # @todo include stats!
         self.query = query
         self.response = response
-        self.entities = entities
 
     def getResponse(self):
         return self.response
 
     def toJson(self):
-        pass
+        return json.dumps({
+            "query": self.query,
+            "response": self.response.output_parsed.model_dump()
+        })
 
     def _renderEntity(self, entity):
         renderer = EntityRenderer(entity)
         return renderer.render('json')
 
-class GenresRagResponse(RagResponse):
+class Instrument(BaseModel):
+    name: str = Field(description = "Exact instrument name from context")
+    description: str = Field(description = "2 sentences that describes the Instrument, replying to user's question. Use information from context")
 
-    def toJson(self):
-        dataDict = {
-            'response': self.response,
-            'genres': [self._renderEntity(entity) for entity in self.entities],
-            'instruments': [self._renderEntity(entity) for entity in self._getInstrumentsFromGenres(self.entities)]
-        }
-        return json.dumps(dataDict)
+class Genre(BaseModel):
+    name: str = Field(description = "Exact genre name from context")
+    description: str = Field(description = "2 sentences that describes the genre, replying to user's question. Use information from context. Do not mention instruments here.")
 
-    def _getInstrumentsFromGenres(self, genres):
-        instruments = {}
-        for genre in genres:
-            for instrument in genre.getInstruments():
-                instruments[str(instrument.getId())] = instrument
-        return instruments.values()
+class GenresRagResponse(BaseModel):
+    answer: str = Field(description = "2-4 sentences containing the answer to the user question based on the context.")
+    genres: List[Genre] = Field(description = "List of found genres. At most 5, ranked by relevance to the question. Every genre must appear only once. Empty when answer is not in the context.")
+    instruments: List[Instrument] = Field(description = "List of found instruments. At most 5, ranked by relevance to the question. Every instrument must appear only once. Empty when answer is not in the context.")
 
 class Rag:
 
@@ -71,7 +70,7 @@ class Rag:
         entities = self.repository.loadMultiple(results)
         prompt = self._buildPrompt(query, entities)
         llm_response = self._queryLlm(prompt)
-        return self.responseClass(query, llm_response, entities)
+        return RagResponse(query, llm_response)
 
     def _queryIndex(self, query):
         return self.index.search(query)
@@ -95,9 +94,10 @@ class Rag:
             {'role': 'user', 'content': prompt}
         ]
 
-        response = self.llm.responses.create(
+        response = self.llm.responses.parse(
             model=MODEL,
-            input=input_messages
+            input=input_messages,
+            text_format=self.responseClass
         )
 
         return response
