@@ -91,3 +91,17 @@ class GenreIndex(models.Model):
 
     class Meta:
         db_table = 'genre_index'
+
+"""Evaluation run results"""
+class EvaluationRun(models.Model):
+
+    created_at = models.DateTimeField(auto_now_add = True)
+    retriever = models.CharField(max_length = 64)
+    k = models.PositiveSmallIntegerField()
+    embedding_model = models.CharField(max_length = 128)
+    hit_rate = models.FloatField(null = True)
+    mrr = models.FloatField(null = True)
+    report = models.JSONField()
+
+    class Meta:
+        db_table = 'evaluation_run'
