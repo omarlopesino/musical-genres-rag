@@ -26,6 +26,7 @@ GENRE:
 '''.strip()
 
 class GenreQuestion(BaseModel):
+    id: str = Field(description = "Exact genre ID from context")
     genre: str = Field(description = "The exact name of the genre from context.")
     kind: Literal['vibe', 'instruments', 'related_genres'] = Field(description = "The trait the question uses to describe the genre.")
     question: str = Field(description = "A 10-15 word question about the genre, without naming it.")
