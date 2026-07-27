@@ -34,11 +34,17 @@ class RagResponse:
     def getResponse(self):
         return self.response
 
-    def toJson(self):
-        return json.dumps({
+    def getAnswer(self):
+        return self.response.output_parsed.model_dump()
+
+    def toDict(self):
+        return {
             "query": self.query,
-            "response": self.response.output_parsed.model_dump()
-        })
+            "answer": self.getAnswer()
+        }
+
+    def toJson(self):
+        return json.dumps(self.toDict())
 
     def _renderEntity(self, entity):
         renderer = EntityRenderer(entity)
