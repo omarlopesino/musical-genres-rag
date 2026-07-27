@@ -40,6 +40,9 @@ class SearchEngine:
 
     def _doIndex(self, attributes, params):
         pass
+    
+    def getName():
+        pass
 
 class PostgresSearchEngine(SearchEngine):
 
@@ -82,3 +85,6 @@ class PostgresSearchEngine(SearchEngine):
 
         with connection.cursor() as cursor:
             cursor.execute(query, params)
+
+    def getName():
+        return 'postgres_' + self.mode
