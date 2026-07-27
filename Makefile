@@ -45,3 +45,9 @@ rag:
 
 groundtruth:
     $(MANAGE) groundtruth
+
+evaluate:
+    $(MANAGE) evaluate
+
+createAnswers:
+    $(MANAGE) createAnswers

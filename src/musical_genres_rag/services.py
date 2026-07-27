@@ -1,4 +1,4 @@
-from musical_genres_rag.Evaluation import GenreQuestionsGroundTruth
+from musical_genres_rag.Evaluation import GenreQuestionsGroundTruth, EvaluationRunner, GroundTruthAnswers
 from musical_genres_rag.Index import Index, PostgresSearchEngine
 from musical_genres_rag.Rag import GenresRag
 from musical_genres_rag.Repository import GenresRepository
@@ -24,3 +24,9 @@ def buildGenresRag():
 
 def buildGenresGroundTruth():
     return GenreQuestionsGroundTruth(buildGenresRepository())
+
+def buildEvaluationRunner():
+    return EvaluationRunner(buildGenresIndex())
+
+def buildGroundTruthAnswers():
+    return GroundTruthAnswers(buildGenresRag())
