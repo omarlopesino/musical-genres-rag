@@ -1,51 +1,51 @@
-genre,kind,question
-pop,vibe,"What upbeat, catchy style of music is especially commercial and accessible?"
-pop,instruments,What genre often features synthesizers and polished electronic keyboard sounds?
-pop,related_genres,What style grew from rock and roll before becoming more mainstream?
-pop,vibe,"What popular music aims for wide appeal with short, memorable songs?"
-pop,related_genres,What music scene split from rock but stayed closely connected historically?
-jazz,vibe,"What genre is known for swing, improvisation, blue notes, and complex chords?"
-jazz,instruments,"What style often features trumpet, trombone, clarinet, and double bass?"
-jazz,related_genres,"What genre grew from blues, ragtime, spirituals, hymns, and marches?"
-jazz,vibe,"What music style emphasizes call and response, polyrhythms, and expressive solos?"
-jazz,instruments,"What genre commonly uses drum set, upright bass, brass, and woodwinds?"
-rock,vibe,"What energetic, guitar-driven style became popular in America and Britain?"
-rock,instruments,"Which style centers on electric guitars, bass, drums, and vocals?"
-rock,related_genres,"What music grew from blues, rhythm and blues, country, and folk?"
-rock,vibe,"What loud popular music genre often features distortion, overdrive, and strong backbeats?"
-rock,related_genres,What genre evolved from rock and roll into many styles?
-hip hop,vibe,What early-1970s street culture blends social commentary with rhythmic spoken delivery?
-hip hop,instruments,"Which music style prominently uses DJs, turntables, scratching, and beatboxing?"
-hip hop,related_genres,What genre grew from African-American and Afro-Caribbean communities in New York City?
-hip hop,vibe,What popular music style centers on rapping over instrumental tracks and beats?
-hip hop,related_genres,Which genre emerged alongside a broader subculture in early 1970s New York?
-acid jazz,vibe,What club-focused genre mixes jazzy grooves with funk and hip-hop beats?
-acid jazz,instruments,"Which genre often features electric bass, drums, trumpet, trombone, and soulful horns?"
-acid jazz,related_genres,What genre grew from rare groove and overlaps with jazz-funk and nu jazz?
-acid jazz,vibe,"What 1980s London scene sounded cool, danceable, and deeply groove-oriented?"
-acid jazz,related_genres,"Which style blends soul, funk, and rap influences into club-friendly jazz?"
-dixieland,vibe,"What early jazz style sounds upbeat, lively, and highly improvisational?"
-dixieland,vibe,"Which New Orleans jazz sound feels festive, brassy, and old-timey?"
-dixieland,instruments,"What jazz style features trumpet, trombone, clarinet, and tuba together?"
-dixieland,instruments,"Which traditional jazz uses banjo, upright bass, and drum set prominently?"
-dixieland,related_genres,What style is also called traditional jazz or hot jazz?
-jazz fusion,vibe,What style blends improvisation with a heavier rock groove and energy?
-jazz fusion,instruments,"What genre commonly features electric guitars, electric bass, and keyboards?"
-jazz fusion,related_genres,"What style grew from jazz mixing with rock, funk, and R&B?"
-jazz fusion,vibe,Which music sounds like jazz solos over amplified backbeats and grooves?
-jazz fusion,instruments,Why do electric bass and amplified guitars appear in this sound?
-pop rock,vibe,"What rock style feels more polished, melodic, and radio-friendly than usual?"
-pop rock,related_genres,Which music blends catchy pop hooks with electric guitar-driven rock?
-pop rock,instruments,"What style commonly uses electric guitar, bass, drums, and sometimes synthesizers?"
-pop rock,vibe,"What genre is often seen as slick, commercial, and less rebellious?"
-pop rock,related_genres,What late-1950s offshoot grew from rock and roll with stronger songwriting?
-rap rock,vibe,What genre blends aggressive guitar riffs with rapped vocals and hard-hitting beats?
-rap rock,instruments,"Which style features electric guitar, bass, and drums behind spoken rhythmic vocals?"
-rap rock,related_genres,What genre mixes hip hop elements with rock instrumentation and attitude?
-rap rock,vibe,What late-1990s style sounds like rock songs delivered with rap verses?
-rap rock,related_genres,What is the fusion of rock and hip hop that became popular recently?
-synth-pop,vibe,"What upbeat, glossy style of pop music relies heavily on electronic sounds?"
-synth-pop,instruments,Which pop genre prominently features keyboards and electronic sound generators?
-synth-pop,related_genres,"What late-1970s new wave style grew from electronic, art rock, and disco influences?"
-synth-pop,vibe,"What catchy, commercial pop sound became popular in the late 1970s and 1980s?"
-synth-pop,related_genres,What genre emerged in Japan and the United Kingdom after post-punk?
+id,genre,kind,question
+1,pop,vibe,"Catchy, mainstream songs with broad appeal and radio-friendly melodies?"
+1,pop,instruments,"What genre uses synthesizers, polished production, and catchy vocal hooks?"
+1,pop,vibe,"Commercial, accessible music that feels upbeat, polished, and widely appealing?"
+1,pop,related_genres,How did rock and roll and youth music evolve into this style?
+1,pop,related_genres,What music genre became distinct from rock after the late 1960s?
+2,jazz,vibe,"What style features swing feel, blue notes, and lots of improvisation?"
+2,jazz,instruments,"Which music style commonly features trumpet, trombone, clarinet, and upright bass?"
+2,jazz,related_genres,"What genre grew from blues, ragtime, spirituals, and European harmony?"
+2,jazz,vibe,"What kind of music has complex chords, polyrhythms, and call-and-response vocals?"
+2,jazz,related_genres,What New Orleans-born style became a major form of musical expression?
+3,rock,vibe,What energetic guitar-driven style grew from blues and country influences?
+3,rock,instruments,"What style centers on electric guitar, bass guitar, drums, and vocals?"
+3,rock,related_genres,What genre evolved from rock and roll and influenced many substyles?
+3,rock,vibe,"What loud, rhythmic popular music became huge in the 1950s and 1960s?"
+3,rock,related_genres,"What music combines electric blues, folk, and rhythm and blues elements?"
+4,hip hop,vibe,What early-1970s urban music style blends social commentary with rhythmic spoken delivery?
+4,hip hop,instruments,"Which genre features DJs, turntablism, scratching, beatboxing, and instrumental tracks?"
+4,hip hop,vibe,What music genre grew from African-American and Afro-Caribbean communities in New York City?
+4,hip hop,related_genres,Which genre is closely linked with rapping as a defining characteristic?
+4,hip hop,related_genres,What popular music style emerged alongside a broader cultural movement in the 1970s?
+5,acid jazz,vibe,"What club-friendly jazz style blends funk, soul, and hip-hop?"
+5,acid jazz,related_genres,Which genre mixes rare groove with jazz-funk and nu jazz?
+5,acid jazz,vibe,What laid-back dance music emerged from London clubs in the 1980s?
+5,acid jazz,instruments,"Which style often features electric bass, drums, trumpet, and trombone?"
+5,acid jazz,related_genres,What London-born club genre later overlapped with jazz-funk and hip-hop?
+6,dixieland,vibe,"What early New Orleans jazz style sounds upbeat, raucous, and collective?"
+6,dixieland,instruments,"Which small-band jazz style features trumpet, trombone, clarinet, banjo, and tuba?"
+6,dixieland,related_genres,What jazz style is also called traditional jazz or hot jazz?
+6,dixieland,vibe,"What kind of jazz feels lively, marching-band-like, and highly improvisational?"
+6,dixieland,related_genres,Which New Orleans-based jazz style emerged in recordings from 1917?
+7,jazz fusion,vibe,"What style blends improvisation with a louder, electric rock feel?"
+7,jazz fusion,instruments,"Which genre commonly uses electric bass, electric guitar, and keyboards?"
+7,jazz fusion,related_genres,"What music combines jazz with rock, funk, and rhythm and blues?"
+7,jazz fusion,vibe,What late-1960s sound is both experimental and groove-driven?
+7,jazz fusion,related_genres,Which genre grew from jazz musicians influenced by rock and roll?
+8,pop rock,vibe,What rock style emphasizes catchy songwriting and polished studio production?
+8,pop rock,vibe,"Which genre sounds commercial, accessible, and less aggressive than hard rock?"
+8,pop rock,instruments,"What style commonly uses electric guitars, bass, drums, and synthesizers?"
+8,pop rock,related_genres,"What sits between pop and rock, blending both into one category?"
+8,pop rock,related_genres,What late-1950s rock-and-roll offshoot became more polished and radio-friendly?
+9,rap rock,vibe,What rock subgenre mixes rapped vocals with aggressive guitar-driven energy?
+9,rap rock,instruments,"Which style uses electric guitar, bass, drums, and rapped vocals?"
+9,rap rock,related_genres,What genre blends hip hop rhythms with hard rock instrumentation?
+9,rap rock,vibe,What late-1990s style sounds like rock songs delivered through rap?
+9,rap rock,related_genres,What fusion genre grew from hip hop DJs playing rock records?
+10,synth-pop,instruments,What genre relies heavily on synthesizers as the main instrument?
+10,synth-pop,vibe,"What upbeat, glossy style emerged from late-1970s new wave?"
+10,synth-pop,related_genres,What genre grew from post-punk and the late-1970s new wave movement?
+10,synth-pop,related_genres,What electronic pop style was influenced by Kraftwerk and krautrock?
+10,synth-pop,vibe,What catchy electronic genre became prominent in Japan and the UK?
