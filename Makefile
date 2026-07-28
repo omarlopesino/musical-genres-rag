@@ -2,17 +2,24 @@ empty :=
 space := $(empty) $(empty)
 .RECIPEPREFIX := $(space)
 
-.PHONY: setup build start stop drop psql migrate seed ingest rag groundtruth
+.PHONY: setup build start stop drop psql migrate seed directories ingest rag groundtruth evaluate createAnswers
 
 DB_NAME = musical_genres
 MANAGE = uv run python manage.py
+GROUND_TRUTH_DIRECTORY = tests/ground_truth
 
 setup:
     uv sync
+    $(MAKE) directories
     docker compose down -v
     docker compose up -d --wait
     $(MAKE) migrate
     $(MAKE) seed
+
+# tests/ holds generated files only and is gitignored, so a fresh clone starts without the
+# directory the ground truth is written into.
+directories:
+    mkdir -p $(GROUND_TRUTH_DIRECTORY)
 
 build:
     docker compose build
