@@ -131,8 +131,15 @@ class Attachment(models.Model):
 """Evaluation run results"""
 class EvaluationRun(models.Model):
 
+    """How much of the pipeline a run scored, so runs are only ever compared against their own kind"""
+    class Type(models.TextChoices):
+        RETRIEVAL = 'retrieval'
+        RAG = 'rag'
+
     id = models.BigAutoField(primary_key = True)
     created_at = models.DateTimeField(auto_now_add = True)
+    # Every run stored so far scored generation too, so existing rows are RAG runs
+    type = models.CharField(max_length = 32, choices = Type.choices, default = Type.RAG)
     ground_truth = models.ForeignKey(Attachment, on_delete = models.PROTECT, related_name = 'evaluation_runs')
     ground_truth_answers = models.ForeignKey(Attachment, on_delete = models.PROTECT, related_name = '+', null = True)
     retriever = models.CharField(max_length = 64)
@@ -144,3 +151,7 @@ class EvaluationRun(models.Model):
 
     class Meta:
         db_table = 'evaluation_run'
+        indexes = [models.Index(fields = ['type', '-created_at'], name = 'evaluation_run_type_created')]
+
+    def getType(self):
+        return self.type
