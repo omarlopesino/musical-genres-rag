@@ -2,11 +2,14 @@ from django.db import connection
 from musical_genres_rag.Embed import TextEmbedder
 from psycopg import sql
 
+DEFAULT_LIMIT = 4
+
 class Index():
 
-    def __init__(self, searchEngine, entityRepository):
+    def __init__(self, searchEngine, entityRepository, limit = DEFAULT_LIMIT):
         self.searchEngine = searchEngine
         self.entityRepository = entityRepository
+        self.limit = limit
 
     def index(self):
         self.searchEngine.clearContent()
@@ -14,11 +17,18 @@ class Index():
         # @todo improve to make it paralelly!
         self._indexEntityBatch(entities)
 
-    def search(self, query, limit = 5):
-        return self.searchEngine.search(query, limit)
+    def search(self, query, limit = None):
+        return self.searchEngine.search(query, limit if limit is not None else self.limit)
 
     def getEngineName(self):
         return self.searchEngine.getName()
+
+    """How many results a search returns, so an evaluation can record the k it scored"""
+    def getLimit(self):
+        return self.limit
+
+    def getEmbeddingModel(self):
+        return self.searchEngine.getEmbeddingModel()
 
     def _indexEntityBatch(self, entities):
         for entity in entities:
@@ -46,6 +56,10 @@ class SearchEngine:
 
     def getName(self):
         pass
+
+    """What embedded the indexed content, which the engine name alone does not tell apart"""
+    def getEmbeddingModel(self):
+        return ','.join(sorted(embedder.__name__ for embedder in self.embedders.values()))
 
 class PostgresSearchEngine(SearchEngine):
 
