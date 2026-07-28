@@ -189,33 +189,76 @@ class EvaluationRunner:
 class HitRate(Evaluator):
 
     def evaluate(self, ctx: EvaluatorContext):
-        return int(ctx.metadata['id']) in ctx.output
+        return int(ctx.metadata['id']) in ctx.output['retrieved']
 
 """Reciprocal rank of the expected genre. Averaged over cases it is the MRR"""
 class MRR(Evaluator):
 
     def evaluate(self, ctx: EvaluatorContext):
         id = int(ctx.metadata['id'])
-        if id not in ctx.output:
+        retrieved = ctx.output['retrieved']
+        if id not in retrieved:
             return 0.0
-        return 1 / (ctx.output.index(id) + 1)
+        return 1 / (retrieved.index(id) + 1)
 
 """Checks if the output contains the genre"""
-class ContainsGenre(Evaluator):
-
+class GenreRagResponseHit(Evaluator):
     def evaluate(self, ctx: EvaluatorContext):
-        return ctx.metadata.genre == ctx.output.getAnswer().genre
+        response = ctx.output
+        return response['answer']['answer'] != UNKNOWN_ANSWER
+
+"""Checks if the output contains the genre"""
+class ResponseGenerationTime(Evaluator):
+    def evaluate(self, ctx: EvaluatorContext):
+        response = ctx.output
+        return response['duration']
 
 """Checks if the output contains the genre"""
 class Cost(Evaluator):
     def evaluate(self, ctx: EvaluatorContext):
-        response = ctx.output.getResponse()
-        input_cost = response.input_tokens / 1_000_000 * 0.6
-        output_cost = response.output_tokens / 1_000_000 * 0.4
+        response = ctx.output
+        input_cost = response['input_tokens'] / 1_000_000 * 0.6
+        output_cost = response['output_tokens'] / 1_000_000 * 0.4
         return {
-            'input_tokens': float(ctx.output.input_tokens),
-            'output_tokens': float(ctx.output.output_tokens),
+            'input_tokens': float(ctx.output['input_tokens']),
+            'output_tokens': float(ctx.output['output_tokens']),
             'total_cost': input_cost + output_cost,
         }
-        return ctx.metadata.genre == ctx.output.genre
 
+"""Retrieval and generation fail independently, so the pair is what tells them apart"""
+class HitDbRag(Evaluator):
+
+    def evaluate(self, ctx: EvaluatorContext):
+        retrieved = HitRate().evaluate(ctx)
+        answered = GenreRagResponseHit().evaluate(ctx)
+        if retrieved and answered:
+            return 'answered'
+        if retrieved:
+            return 'generation_miss'
+        if answered:
+            return 'answered_without_genre'
+        return 'retrieval_miss'
+
+"""The genres an answer named, in the order it ranked them"""
+def answeredGenres(output):
+    return [normalizeGenre(genre['name']) for genre in output['answer']['genres']]
+
+"""Names are matched as the ground truth and the answer both spell them, not byte for byte"""
+def normalizeGenre(name):
+    return name.strip().casefold()
+
+"""Checks if the expected genre is named in the answer at all. Averaged over cases it is the hit rate"""
+class GenreRagGenreHit(Evaluator):
+
+    def evaluate(self, ctx: EvaluatorContext):
+        return normalizeGenre(ctx.metadata['genre']) in answeredGenres(ctx.output)
+
+"""Reciprocal rank of the expected genre inside the answer. Averaged over cases it is the MRR"""
+class GenreRagGenreMrr(Evaluator):
+
+    def evaluate(self, ctx: EvaluatorContext):
+        genre = normalizeGenre(ctx.metadata['genre'])
+        genres = answeredGenres(ctx.output)
+        if genre not in genres:
+            return 0.0
+        return 1 / (genres.index(genre) + 1)
