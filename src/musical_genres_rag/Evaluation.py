@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from musical_genres_rag.models import Attachment
+from musical_genres_rag.models import Attachment, EvaluationRun
+from musical_genres_rag.Rag import EmptyRagResponse, EmptyRetrievalError, UNKNOWN_ANSWER
 from musical_genres_rag.Renderer import EntityRenderer
 from typing import List, Literal
 from datetime import datetime
@@ -8,12 +9,19 @@ import pandas
 
 from pydantic_evals import Case, Dataset
 from pydantic_evals.evaluators import Evaluator, EvaluatorContext
+from pydantic_evals.reporting import EvaluationReportAdapter
 
 import csv
 import json
 
 GROUND_TRUTH_DIRECTORY = './tests/ground_truth'
 TIMESTAMP_FORMAT = '%Y%m%d-%H%M%S'
+
+"""The only two columns every ground truth must carry: what was asked, and what it was asked about"""
+QUESTION_COLUMN = 'question'
+ID_COLUMN = 'id'
+# Everything else describes the subject, and is what a case is named after
+RESERVED_COLUMNS = (ID_COLUMN, QUESTION_COLUMN)
 
 MODEL = 'gpt-5.4-mini'
 
@@ -26,12 +34,22 @@ def buildAttachmentPath(name, extension, directory = GROUND_TRUTH_DIRECTORY):
         extension = extension,
     )
 
-"""The generators read whatever ground truth was registered last, so a run always scores the newest set"""
+"""Get the latest ground truth file genrated, if exists"""
 def requireLatestGroundTruth(attachmentsRepository):
     groundTruth = attachmentsRepository.getLatestGroundTruth()
     if groundTruth is None:
         raise RuntimeError('No ground truth registered, run "make groundtruth" first.')
     return groundTruth
+
+"""Get the latest ground truth answers file generated, if exists."""
+def requireLatestGroundTruthAnswer(attachmentsRepository, index):
+    latestResponse = attachmentsRepository.getLatestGroundTruthResponses(index.getEngineName())
+    # Answers belong to the engine that produced them, so a new engine has none until it is run
+    if latestResponse is None:
+        raise RuntimeError('No ground truth answers registered for "{engine}", run "make createAnswers ENGINE={engine}" first.'.format(
+            engine = index.getEngineName(),
+        ))
+    return latestResponse
 
 INSTRUCTIONS = '''
 You are some musician looking up to learn about genres. 
@@ -126,7 +144,7 @@ class GroundTruthAnswers:
             responses = []
             for row in reader:
                 [id, genre, kind, question] = row
-                response = self.rag.query(question)
+                response = self._answer(question)
                 responses.append({
                     'id': id,
                     'kind': kind,
@@ -142,48 +160,170 @@ class GroundTruthAnswers:
             self.rag.getEngineName(),
         )
 
+    """A question the index cannot answer is still a question the evaluation must score, so it is
+    recorded as an unanswered one rather than aborting a run of paid calls"""
+    def _answer(self, question):
+        try:
+            return self.rag.query(question)
+        except EmptyRetrievalError as error:
+            return EmptyRagResponse(error.getQuery(), error.getDuration())
 
+
+"""Scores a ground truth and stores what it scored.
+
+Holds no knowledge of what the questions are about: the ground truth file names its own
+columns, and a subclass names the response to score and the metrics worth running over it.
+"""
 class EvaluationRunner:
 
-    def __init__(self, index, attachmentsRepository):
+    def __init__(self, index, attachmentsRepository, evaluationRunsRepository, type, name, evaluators):
         self.index = index
         self.attachmentsRepository = attachmentsRepository
+        self.evaluationRunsRepository = evaluationRunsRepository
+        self.type = type
+        self.name = name
+        self.evaluators = evaluators
+        # Resolved once, so the run is stored against the very file it scored
+        self.groundTruth = requireLatestGroundTruth(attachmentsRepository)
 
+    """Returns the stored run, printed as it is written so a failed save still shows the report"""
     def execute(self):
-        searchEvaluationResults = self._evaluateSearch()
-        searchEvaluationResults.print()
+        report = self._evaluate()
+        report.print()
+        return self._save(report)
 
-    def _evaluateSearch(self):
-        dataset = Dataset(
-            name = 'musical_genres_rag',
-            cases = self._generateAllCases(),
-            evaluators = [HitRate(), MRR()]
+    """What a case is scored against: a subclass either replays a recorded run or queries live"""
+    def _getResponse(self, question):
+        raise NotImplementedError
+
+    """The answers file a run scored, for the runs that scored one at all"""
+    def _getGroundTruthAnswers(self):
+        return None
+
+    def _save(self, report):
+        return self.evaluationRunsRepository.create(
+            type = self.type,
+            groundTruth = self.groundTruth,
+            groundTruthAnswers = self._getGroundTruthAnswers(),
+            retriever = self.index.getEngineName(),
+            k = self.index.getLimit(),
+            embeddingModel = self.index.getEmbeddingModel(),
+            hitRate = self._averageAssertion(report, 'HitRate'),
+            mrr = self._averageScore(report, 'MRR'),
+            report = EvaluationReportAdapter.dump_python(report, mode = 'json'),
         )
 
-        return dataset.evaluate_sync(self.index.search)
+    """A boolean evaluator lands in the assertions, which aggregate as one rate over every evaluator"""
+    def _averageAssertion(self, report, name):
+        values = [
+            case.assertions[name].value for case in report.cases
+                if name in case.assertions
+        ]
+        return sum(values) / len(values) if values else None
+
+    def _averageScore(self, report, name):
+        averages = report.averages()
+        return averages.scores.get(name) if averages is not None else None
+
+    def _evaluate(self):
+        dataset = Dataset(
+            name = self.name,
+            cases = self._generateAllCases(),
+            evaluators = self.evaluators,
+        )
+
+        return dataset.evaluate_sync(self._getResponse)
 
     def _generateAllCases(self):
-        groundTruth = requireLatestGroundTruth(self.attachmentsRepository)
         cases = []
-        with open(groundTruth.getPath(), newline='') as csvfile:
+        with open(self.groundTruth.getPath(), newline='') as csvfile:
             reader = csv.reader(csvfile)
             headings = next(reader)
             for index, row in enumerate(reader):
-                cases.append(self._generateUseCase(row, index))
+                cases.append(self._generateUseCase(headings, row, index))
         return cases
 
-    def _generateUseCase(self, row, index):
-        id, genre, kind, question = row
+    """Every column becomes metadata, so a ground truth may carry traits this class never heard of"""
+    def _generateUseCase(self, headings, row, index):
+        metadata = dict(zip(headings, row))
         return Case(
-            name = genre + '_' + kind + '_' + str(index),
-            inputs = question,
-            metadata = {
-                'id': id,
-                'kind': kind,
-                'genre': genre,
-                'question': question
-            }
+            name = self._generateCaseName(metadata, index),
+            inputs = metadata[QUESTION_COLUMN],
+            metadata = metadata,
         )
+
+    """Named after whatever traits the ground truth describes its subject by, never after the subject"""
+    def _generateCaseName(self, metadata, index):
+        traits = [
+            value for heading, value in metadata.items()
+                if heading not in RESERVED_COLUMNS
+        ]
+        return '_'.join([*traits, str(index)])
+
+"""Scores the whole pipeline over a recorded run: what the index retrieved, and what the LLM made of it.
+
+Replays the answers file rather than querying anything, so the generation it scores is
+paid for once, by "make createAnswers".
+"""
+class GenresRagEvaluationRunner(EvaluationRunner):
+
+    def __init__(self, index, attachmentsRepository, evaluationRunsRepository):
+        super().__init__(
+            index,
+            attachmentsRepository,
+            evaluationRunsRepository,
+            EvaluationRun.Type.RAG,
+            'musical_genres_rag',
+            [
+                HitRate(),
+                MRR(),
+                Cost(),
+                GenreRagResponseHit(),
+                ResponseGenerationTime(),
+                HitDbRag(),
+                GenreRagGenreHit(),
+                GenreRagGenreMrr(),
+            ],
+        )
+        self.groundTruthAnswers = requireLatestGroundTruthAnswer(attachmentsRepository, index)
+        self.recordedResponses = self._loadRecordedResponses()
+
+    def _getGroundTruthAnswers(self):
+        return self.groundTruthAnswers
+
+    def _getResponse(self, question):
+        return next(
+            response for response in self.recordedResponses
+                if response['query'] == question
+        )
+
+    def _loadRecordedResponses(self):
+        with open(self.groundTruthAnswers.getPath()) as file:
+            return json.load(file)
+
+"""Scores retrieval alone, by querying the index live.
+
+Costs no LLM call and needs no answers file, so an engine, a mode or a k can be measured
+as often as it is changed rather than only where generation was already paid for.
+"""
+class GenresRetrievalEvaluationRunner(EvaluationRunner):
+
+    def __init__(self, index, attachmentsRepository, evaluationRunsRepository):
+        super().__init__(
+            index,
+            attachmentsRepository,
+            evaluationRunsRepository,
+            EvaluationRun.Type.RETRIEVAL,
+            'musical_genres_retrieval',
+            [
+                HitRate(),
+                MRR(),
+            ],
+        )
+
+    """Shaped like the retrieval half of a recorded response, so both runners share their evaluators"""
+    def _getResponse(self, question):
+        return {'retrieved': self.index.search(question)}
 
 """Checks if the expected genre is retrieved at all. Averaged over cases it is the hit rate"""
 class HitRate(Evaluator):
