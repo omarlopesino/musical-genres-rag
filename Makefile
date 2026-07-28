@@ -2,11 +2,16 @@ empty :=
 space := $(empty) $(empty)
 .RECIPEPREFIX := $(space)
 
-.PHONY: setup build start stop drop psql migrate seed directories ingest rag groundtruth evaluate createAnswers
+.PHONY: setup build start stop drop psql migrate seed directories ingest rag groundtruth evaluate evaluateRetrieval createAnswers
 
 DB_NAME = musical_genres
 MANAGE = uv run python manage.py
 GROUND_TRUTH_DIRECTORY = tests/ground_truth
+
+# Which search engine the index, rag and evaluation targets run through, as in
+# "make evaluateRetrieval ENGINE=postgres_text". Left unset, each command uses its own default.
+ENGINE ?=
+ENGINE_ARG = $(if $(ENGINE),--engine $(ENGINE))
 
 setup:
     uv sync
@@ -45,16 +50,21 @@ seed:
     docker compose exec -T db psql -U postgres -d $(DB_NAME) -f /data/load.sql
 
 ingest:
-    $(MANAGE) ingest
+    $(MANAGE) ingest $(ENGINE_ARG)
 
 rag:
-    $(MANAGE) rag
+    $(MANAGE) rag $(ENGINE_ARG)
 
+# No engine: the questions come straight from the repository, with no index searched
 groundtruth:
     $(MANAGE) groundtruth
 
 evaluate:
-    $(MANAGE) evaluate
+    $(MANAGE) evaluate $(ENGINE_ARG)
+
+# Retrieval only: no LLM call and no answers file, so it is free to re-run while tuning an engine
+evaluateRetrieval:
+    $(MANAGE) evaluate --type retrieval $(ENGINE_ARG)
 
 createAnswers:
-    $(MANAGE) createAnswers
+    $(MANAGE) createAnswers $(ENGINE_ARG)
