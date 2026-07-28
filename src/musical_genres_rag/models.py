@@ -92,11 +92,49 @@ class GenreIndex(models.Model):
     class Meta:
         db_table = 'genre_index'
 
+"""A generated file on disk, kept addressable so an evaluation can name the exact inputs it ran on"""
+class Attachment(models.Model):
+
+    class Type(models.TextChoices):
+        GROUND_TRUTH = 'ground_truth'
+        GROUND_TRUTH_ANSWERS = 'ground_truth_answers'
+
+    id = models.BigAutoField(primary_key = True)
+    path = models.CharField(max_length = 512)
+    type = models.CharField(max_length = 32, choices = Type.choices)
+    created = models.DateTimeField(auto_now_add = True)
+    # Ground truth questions are generated straight from the repository, with no index involved
+    engine = models.CharField(max_length = 64, null = True)
+
+    class Meta:
+        db_table = 'attachment'
+        indexes = [models.Index(fields = ['type', '-created'], name = 'attachment_type_created')]
+
+    def getId(self):
+        return self.id
+
+    def getPath(self):
+        return self.path
+
+    def getType(self):
+        return self.type
+
+    def getCreated(self):
+        return self.created
+
+    def getEngine(self):
+        return self.engine
+
+    def __str__(self):
+        return self.path
+
 """Evaluation run results"""
 class EvaluationRun(models.Model):
 
     id = models.BigAutoField(primary_key = True)
     created_at = models.DateTimeField(auto_now_add = True)
+    ground_truth = models.ForeignKey(Attachment, on_delete = models.PROTECT, related_name = 'evaluation_runs')
+    ground_truth_answers = models.ForeignKey(Attachment, on_delete = models.PROTECT, related_name = '+', null = True)
     retriever = models.CharField(max_length = 64)
     k = models.PositiveSmallIntegerField()
     embedding_model = models.CharField(max_length = 128)

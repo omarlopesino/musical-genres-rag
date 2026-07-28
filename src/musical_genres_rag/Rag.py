@@ -78,6 +78,10 @@ class Rag:
         llm_response = self._queryLlm(prompt)
         return RagResponse(query, llm_response)
 
+    """Whoever holds a Rag never holds its index, so the engine it retrieved with is reachable from here"""
+    def getEngineName(self):
+        return self.index.getEngineName()
+
     def _queryIndex(self, query):
         return self.index.search(query)
 

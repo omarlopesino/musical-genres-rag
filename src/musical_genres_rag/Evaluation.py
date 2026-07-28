@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
+from musical_genres_rag.models import Attachment
 from musical_genres_rag.Renderer import EntityRenderer
 from typing import List, Literal
+from datetime import datetime
 from openai import OpenAI
 import pandas
 
@@ -10,10 +12,26 @@ from pydantic_evals.evaluators import Evaluator, EvaluatorContext
 import csv
 import json
 
-GROUND_TRUTH_PATH = './tests/ground_truth/ground_truth.csv'
-ANSWERS_PATH = './tests/ground_truth/responses.json'
+GROUND_TRUTH_DIRECTORY = './tests/ground_truth'
+TIMESTAMP_FORMAT = '%Y%m%d-%H%M%S'
 
 MODEL = 'gpt-5.4-mini'
+
+"""Every generated file carries the moment it was written, so runs never overwrite each other"""
+def buildAttachmentPath(name, extension, directory = GROUND_TRUTH_DIRECTORY):
+    return '{directory}/{name}_{timestamp}.{extension}'.format(
+        directory = directory,
+        name = name,
+        timestamp = datetime.now().strftime(TIMESTAMP_FORMAT),
+        extension = extension,
+    )
+
+"""The generators read whatever ground truth was registered last, so a run always scores the newest set"""
+def requireLatestGroundTruth(attachmentsRepository):
+    groundTruth = attachmentsRepository.getLatestGroundTruth()
+    if groundTruth is None:
+        raise RuntimeError('No ground truth registered, run "make groundtruth" first.')
+    return groundTruth
 
 INSTRUCTIONS = '''
 You are some musician looking up to learn about genres. 
@@ -45,14 +63,17 @@ class GenreQuestions(BaseModel):
 
 class GroundTruth:
     
-    def __init__(self, repository, responseClass):
+    def __init__(self, repository, attachmentsRepository, responseClass):
         self.repository = repository
+        self.attachmentsRepository = attachmentsRepository
         self.responseClass = responseClass
         self.llm = OpenAI()
 
-    def generate(self, outputPath = GROUND_TRUTH_PATH):
+    """Returns the attachment the questions were written to"""
+    def generate(self, outputPath = None):
         # @todo tqdm
         # @todo load all
+        outputPath = outputPath if outputPath is not None else buildAttachmentPath('ground_truth', 'csv')
         entities = self.repository.loadMultiple()
         ground_truth = []
         for entity in entities:
@@ -61,6 +82,9 @@ class GroundTruth:
                 ground_truth.append(question)
         ground_truth_dataframe = pandas.DataFrame(ground_truth)
         ground_truth_dataframe.to_csv(outputPath, index = False)
+
+        # No engine: the questions come straight from the repository, no index is searched
+        return self.attachmentsRepository.create(outputPath, Attachment.Type.GROUND_TRUTH)
 
     def _queryEntityGroundTruth(self, entity):
         prompt = PROMPT.format(genre = self._renderEntity(entity))
@@ -83,17 +107,20 @@ class GroundTruth:
 
 class GenreQuestionsGroundTruth(GroundTruth):
 
-    def __init__(self, repository):
-        super().__init__(repository, GenreQuestions)
+    def __init__(self, repository, attachmentsRepository):
+        super().__init__(repository, attachmentsRepository, GenreQuestions)
 
 class GroundTruthAnswers:
 
-    def __init__(self, rag, groundTruthPath = GROUND_TRUTH_PATH):
+    def __init__(self, rag, attachmentsRepository):
         self.rag = rag
-        self.groundTruthPath = groundTruthPath
+        self.attachmentsRepository = attachmentsRepository
 
+    """Returns the attachment the answers were written to"""
     def generate(self):
-        with open(self.groundTruthPath, newline='') as csvfile:
+        groundTruth = requireLatestGroundTruth(self.attachmentsRepository)
+        outputPath = buildAttachmentPath('ground_truth_answers', 'json')
+        with open(groundTruth.getPath(), newline='') as csvfile:
             reader = csv.reader(csvfile)
             headings = next(reader)
             responses = []
@@ -106,15 +133,21 @@ class GroundTruthAnswers:
                     'genre': genre,
                     **response.toDict(),
                 })
-        with open(ANSWERS_PATH, 'w') as jsonfile:
+        with open(outputPath, 'w') as jsonfile:
             json.dump(responses, jsonfile, indent = 2)
+
+        return self.attachmentsRepository.create(
+            outputPath,
+            Attachment.Type.GROUND_TRUTH_ANSWERS,
+            self.rag.getEngineName(),
+        )
 
 
 class EvaluationRunner:
 
-    def __init__(self, index, groundTruthPath = GROUND_TRUTH_PATH):
+    def __init__(self, index, attachmentsRepository):
         self.index = index
-        self.groundTruthPath = groundTruthPath
+        self.attachmentsRepository = attachmentsRepository
 
     def execute(self):
         searchEvaluationResults = self._evaluateSearch()
@@ -130,8 +163,9 @@ class EvaluationRunner:
         return dataset.evaluate_sync(self.index.search)
 
     def _generateAllCases(self):
+        groundTruth = requireLatestGroundTruth(self.attachmentsRepository)
         cases = []
-        with open(self.groundTruthPath, newline='') as csvfile:
+        with open(groundTruth.getPath(), newline='') as csvfile:
             reader = csv.reader(csvfile)
             headings = next(reader)
             for index, row in enumerate(reader):

@@ -1,4 +1,4 @@
-from musical_genres_rag.models import Genre, Instrument
+from musical_genres_rag.models import Attachment, Genre, Instrument
 
 class RepositoryBase():
 
@@ -27,6 +27,28 @@ class InstrumentsRepository(RepositoryBase):
 
     def __init__(self):
         super().__init__(Instrument)
+
+class AttachmentsRepository(RepositoryBase):
+
+    def __init__(self):
+        super().__init__(Attachment)
+
+    def getLatestGroundTruth(self):
+        return self._getLatest(Attachment.Type.GROUND_TRUTH)
+
+    """Answers are only comparable within the engine that produced them, so the engine picks the file"""
+    def getLatestGroundTruthResponses(self, engine):
+        return self._getLatest(Attachment.Type.GROUND_TRUTH_ANSWERS, engine)
+
+    def create(self, path, type, engine = None):
+        return self.model.objects.create(path = path, type = type, engine = engine)
+
+    """Ties break on id so two files written inside the same second still order deterministically"""
+    def _getLatest(self, type, engine = None):
+        attachments = self.model.objects.filter(type = type)
+        if engine is not None:
+            attachments = attachments.filter(engine = engine)
+        return attachments.order_by('-created', '-id').first()
 
 class GenresRepository(RepositoryBase):
 

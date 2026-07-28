@@ -1,7 +1,7 @@
 from musical_genres_rag.Evaluation import GenreQuestionsGroundTruth, EvaluationRunner, GroundTruthAnswers
 from musical_genres_rag.Index import Index, PostgresSearchEngine
 from musical_genres_rag.Rag import GenresRag
-from musical_genres_rag.Repository import GenresRepository
+from musical_genres_rag.Repository import AttachmentsRepository, GenresRepository
 
 GENRE_INDEX_TABLE = 'genre_index'
 
@@ -14,6 +14,9 @@ touches genres does not open a database connection or an OpenAI client.
 def buildGenresRepository():
     return GenresRepository()
 
+def buildAttachmentsRepository():
+    return AttachmentsRepository()
+
 def buildGenresIndex(repository = None):
     repository = repository if repository is not None else buildGenresRepository()
     return Index(PostgresSearchEngine(GENRE_INDEX_TABLE), repository)
@@ -23,10 +26,10 @@ def buildGenresRag():
     return GenresRag(repository, buildGenresIndex(repository))
 
 def buildGenresGroundTruth():
-    return GenreQuestionsGroundTruth(buildGenresRepository())
+    return GenreQuestionsGroundTruth(buildGenresRepository(), buildAttachmentsRepository())
 
 def buildEvaluationRunner():
-    return EvaluationRunner(buildGenresIndex())
+    return EvaluationRunner(buildGenresIndex(), buildAttachmentsRepository())
 
 def buildGroundTruthAnswers():
-    return GroundTruthAnswers(buildGenresRag())
+    return GroundTruthAnswers(buildGenresRag(), buildAttachmentsRepository())

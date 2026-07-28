@@ -17,6 +17,9 @@ class Index():
     def search(self, query, limit = 5):
         return self.searchEngine.search(query, limit)
 
+    def getEngineName(self):
+        return self.searchEngine.getName()
+
     def _indexEntityBatch(self, entities):
         for entity in entities:
             self.searchEngine.indexEntity(entity)
@@ -40,8 +43,8 @@ class SearchEngine:
 
     def _doIndex(self, attributes, params):
         pass
-    
-    def getName():
+
+    def getName(self):
         pass
 
 class PostgresSearchEngine(SearchEngine):
@@ -49,6 +52,7 @@ class PostgresSearchEngine(SearchEngine):
     def __init__(self, table, mode = 'text'):
         super().__init__(self._getEmbedders(mode))
         self.table = table
+        self.mode = mode
         self.textIndex = table + '_text'
 
     def _getEmbedders(self, mode):
@@ -86,5 +90,5 @@ class PostgresSearchEngine(SearchEngine):
         with connection.cursor() as cursor:
             cursor.execute(query, params)
 
-    def getName():
+    def getName(self):
         return 'postgres_' + self.mode
