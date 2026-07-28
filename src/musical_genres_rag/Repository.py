@@ -1,4 +1,4 @@
-from musical_genres_rag.models import Attachment, Genre, Instrument
+from musical_genres_rag.models import Attachment, EvaluationRun, Genre, Instrument
 
 class RepositoryBase():
 
@@ -49,6 +49,25 @@ class AttachmentsRepository(RepositoryBase):
         if engine is not None:
             attachments = attachments.filter(engine = engine)
         return attachments.order_by('-created', '-id').first()
+
+class EvaluationRunsRepository(RepositoryBase):
+
+    def __init__(self):
+        super().__init__(EvaluationRun)
+
+    """The attachments are kept as relations so a run always names the exact files it scored"""
+    def create(self, type, groundTruth, groundTruthAnswers, retriever, k, embeddingModel, hitRate, mrr, report):
+        return self.model.objects.create(
+            type = type,
+            ground_truth = groundTruth,
+            ground_truth_answers = groundTruthAnswers,
+            retriever = retriever,
+            k = k,
+            embedding_model = embeddingModel,
+            hit_rate = hitRate,
+            mrr = mrr,
+            report = report,
+        )
 
 class GenresRepository(RepositoryBase):
 
