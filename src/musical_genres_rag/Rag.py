@@ -2,6 +2,7 @@ from musical_genres_rag.Renderer import EntityRenderer
 from typing import List
 from pydantic import BaseModel, Field
 from openai import OpenAI
+from time import perf_counter
 import json
 
 INSTRUCTIONS = '''
@@ -24,23 +25,45 @@ CONTEXT:
 
 MODEL = 'gpt-5.4-mini'
 
+"""What an answer reads like when the context does not hold it, whether the LLM said so or nothing was retrieved"""
+UNKNOWN_ANSWER = "I don't know. "
+
 class RagResponse:
 
-    def __init__(self, query, response):
-        # @todo include stats!
+    def __init__(self, query, retrieved, response, duration):
         self.query = query
+        self.retrieved = retrieved
         self.response = response
+        self.duration = duration
 
     def getResponse(self):
         return self.response
 
+    """The ids the index returned, so retrieval and generation are scored over the same run"""
+    def getRetrieved(self):
+        return self.retrieved
+
     def getAnswer(self):
         return self.response.output_parsed.model_dump()
+
+    """Seconds the whole query took: the LLM response carries tokens but never the time they cost"""
+    def getDuration(self):
+        return self.duration
+
+    def getInputTokens(self):
+        return self.response.usage.input_tokens
+
+    def getOutputTokens(self):
+        return self.response.usage.output_tokens
 
     def toDict(self):
         return {
             "query": self.query,
-            "answer": self.getAnswer()
+            "retrieved": self.getRetrieved(),
+            "answer": self.getAnswer(),
+            "duration": round(self.getDuration(), 3),
+            "input_tokens": self.getInputTokens(),
+            "output_tokens": self.getOutputTokens(),
         }
 
     def toJson(self):
@@ -63,6 +86,40 @@ class GenresRagResponse(BaseModel):
     genres: List[Genre] = Field(description = "List of found genres. At most 5, ranked by relevance to the question. Every genre must appear only once. Empty when answer is not in the context.")
     instruments: List[Instrument] = Field(description = "List of found instruments. At most 5, ranked by relevance to the question. Every instrument must appear only once. Empty when answer is not in the context.")
 
+"""Raised instead of prompting an LLM with a context the index never filled"""
+class EmptyRetrievalError(RuntimeError):
+
+    def __init__(self, query, duration = 0.0):
+        super().__init__('The index returned no results for "{query}", so the LLM was not queried.'.format(query = query))
+        self.query = query
+        self.duration = duration
+
+    def getQuery(self):
+        return self.query
+
+    """The search still cost time, and it is the only time this query ever spent"""
+    def getDuration(self):
+        return self.duration
+
+"""The answer given when nothing was retrieved.
+
+Shaped exactly like a generated one so an unanswerable query is still a row in the
+answers file and a case in the evaluation, rather than a hole in both.
+"""
+class EmptyRagResponse(RagResponse):
+
+    def __init__(self, query, duration = 0.0):
+        super().__init__(query, [], None, duration)
+
+    def getAnswer(self):
+        return GenresRagResponse(answer = UNKNOWN_ANSWER, genres = [], instruments = []).model_dump()
+
+    def getInputTokens(self):
+        return 0
+
+    def getOutputTokens(self):
+        return 0
+
 class Rag:
 
     def __init__(self, repository, index, responseClass):
@@ -72,11 +129,15 @@ class Rag:
         self.responseClass = responseClass
 
     def query(self, query):
+        start = perf_counter()
         results = self._queryIndex(query)
+        # No results means no context, and loadMultiple reads an empty selection as "load everything"
+        if not results:
+            raise EmptyRetrievalError(query, perf_counter() - start)
         entities = self.repository.loadMultiple(results)
         prompt = self._buildPrompt(query, entities)
         llm_response = self._queryLlm(prompt)
-        return RagResponse(query, llm_response)
+        return RagResponse(query, results, llm_response, perf_counter() - start)
 
     """Whoever holds a Rag never holds its index, so the engine it retrieved with is reachable from here"""
     def getEngineName(self):
