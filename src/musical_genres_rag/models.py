@@ -148,6 +148,9 @@ class EvaluationRun(models.Model):
     hit_rate = models.FloatField(null = True)
     mrr = models.FloatField(null = True)
     report = models.JSONField()
+    # pydantic-evals aggregates every case but serializes only the cases themselves, so the
+    # aggregate is stored here rather than averaged again by whoever reads the run back
+    averages = models.JSONField(null = True)
 
     class Meta:
         db_table = 'evaluation_run'
@@ -155,3 +158,6 @@ class EvaluationRun(models.Model):
 
     def getType(self):
         return self.type
+
+    def getAverages(self):
+        return self.averages

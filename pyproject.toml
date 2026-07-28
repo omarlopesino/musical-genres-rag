@@ -10,10 +10,12 @@ dependencies = [
     "dotenv>=0.9.9",
     "openai>=2.48.0",
     "pandas>=3.0.5",
-    "psycopg>=3.3.4",
+    # The binary wheel carries its own libpq, so the dashboard image needs no system package
+    "psycopg[binary]>=3.3.4",
     "pydantic>=2.13.4",
     "pydantic-evals>=2.18.0",
     "redis>=8.0.1",
+    "streamlit>=1.60.0",
 ]
 
 [build-system]

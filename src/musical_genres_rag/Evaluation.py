@@ -211,7 +211,13 @@ class EvaluationRunner:
             hitRate = self._averageAssertion(report, 'HitRate'),
             mrr = self._averageScore(report, 'MRR'),
             report = EvaluationReportAdapter.dump_python(report, mode = 'json'),
+            averages = self._averages(report),
         )
+
+    """The aggregate pydantic-evals computed, kept because dumping the report leaves it behind"""
+    def _averages(self, report):
+        averages = report.averages()
+        return averages.model_dump(mode = 'json') if averages is not None else None
 
     """A boolean evaluator lands in the assertions, which aggregate as one rate over every evaluator"""
     def _averageAssertion(self, report, name):

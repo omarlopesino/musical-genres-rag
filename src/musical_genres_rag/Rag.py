@@ -26,7 +26,7 @@ CONTEXT:
 MODEL = 'gpt-5.4-mini'
 
 """What an answer reads like when the context does not hold it, whether the LLM said so or nothing was retrieved"""
-UNKNOWN_ANSWER = "I don't know. "
+UNKNOWN_ANSWER = "I don't know."
 
 class RagResponse:
 

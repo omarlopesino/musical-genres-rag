@@ -26,5 +26,29 @@ services:
     ports:
       - "6379:6379"
 
+  # The evaluation dashboard, served here rather than started by hand so the report URL an Airflow
+  # run links to keeps resolving. The Dockerfile in this repository builds the database image, so
+  # this runs the stock uv image over the sources instead of adding a second one to maintain.
+  dashboard:
+    container_name: ${PROJECT_NAME}_dashboard
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+    working_dir: /app
+    command: uv run streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501
+    env_file: .env
+    # settings.py loads .env without overriding, so these win over the values the host reaches
+    environment:
+      POSTGRES_HOST: db
+      REDIS_HOST: redis
+    volumes:
+      - ./:/app
+      # Without this the bind mount above hands the container the virtualenv built for the host
+      - mgr_dashboard_venv:/app/.venv
+    ports:
+      - "8501:8501"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   mgr_pgdata:
+  mgr_dashboard_venv:

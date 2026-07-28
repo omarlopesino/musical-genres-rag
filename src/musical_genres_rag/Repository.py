@@ -56,7 +56,7 @@ class EvaluationRunsRepository(RepositoryBase):
         super().__init__(EvaluationRun)
 
     """The attachments are kept as relations so a run always names the exact files it scored"""
-    def create(self, type, groundTruth, groundTruthAnswers, retriever, k, embeddingModel, hitRate, mrr, report):
+    def create(self, type, groundTruth, groundTruthAnswers, retriever, k, embeddingModel, hitRate, mrr, report, averages):
         return self.model.objects.create(
             type = type,
             ground_truth = groundTruth,
@@ -67,7 +67,33 @@ class EvaluationRunsRepository(RepositoryBase):
             hit_rate = hitRate,
             mrr = mrr,
             report = report,
+            averages = averages,
         )
+
+    """The runs a dashboard filter asks for. An empty filter is no filter, so the page opens on everything"""
+    def findFiltered(self, types = None, embeddingModels = None, since = None, until = None):
+        runs = self.model.objects.all()
+
+        if types:
+            runs = runs.filter(type__in = types)
+        if embeddingModels:
+            runs = runs.filter(embedding_model__in = embeddingModels)
+        if since is not None:
+            runs = runs.filter(created_at__date__gte = since)
+        if until is not None:
+            runs = runs.filter(created_at__date__lte = until)
+
+        return list(runs.order_by('-created_at'))
+
+    """The filter options come from what is actually stored, so a filter can never empty the list by itself"""
+    def getTypes(self):
+        return self._getDistinct('type')
+
+    def getEmbeddingModels(self):
+        return self._getDistinct('embedding_model')
+
+    def _getDistinct(self, field):
+        return list(self.model.objects.values_list(field, flat = True).distinct().order_by(field))
 
 class GenresRepository(RepositoryBase):
 
