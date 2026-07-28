@@ -95,6 +95,7 @@ class GenreIndex(models.Model):
 """Evaluation run results"""
 class EvaluationRun(models.Model):
 
+    id = models.BigAutoField(primary_key = True)
     created_at = models.DateTimeField(auto_now_add = True)
     retriever = models.CharField(max_length = 64)
     k = models.PositiveSmallIntegerField()
