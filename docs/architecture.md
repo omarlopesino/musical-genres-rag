@@ -87,6 +87,74 @@ classDiagram
     GenresRepository ..> Genre : loads
 ```
 
+## The API
+
+`Api.py` is a second entry point onto the same builders `manage.py` goes through, so what an
+orchestrator runs and what a shell runs are one piece of code. It waits for none of it: the work
+goes to a thread and the caller is handed the task it reads the outcome from. See
+[api.md](api.md) for the endpoints themselves.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Api {
+        +api: NinjaAPI
+        +dispatch(operation, payload, work, failure)
+        +ingesting(engine)
+        +generating()
+        +answering(engine)
+        +evaluating(runner, engine, info)
+    }
+
+    class BackgroundTasks {
+        +spawn(work, progress, failure)
+    }
+
+    class OperationLock {
+        +operation
+        +take(task)
+        +holder()
+        +release()
+    }
+
+    class Progress {
+        +operation
+        +start(phase, total)
+        +enter(phase)
+        +advance(amount)
+        +finish(result)
+    }
+
+    class CacheProgress {
+        +task
+        +current
+        +total
+    }
+
+    class Services["services.py"] {
+        +buildGenresIndex()
+        +buildGenresGroundTruth()
+        +buildGroundTruthAnswers()
+        +buildGenresRagEvaluationRunner()
+        +buildGenresRetrievalEvaluationRunner()
+    }
+
+    Progress <|-- CacheProgress
+    Api --> BackgroundTasks : hands the work to
+    Api --> OperationLock : refuses a second run with
+    Api --> CacheProgress : opens one per task
+    Api ..> Services : builds through, as the commands do
+    BackgroundTasks --> Progress : finishes
+    CacheProgress --> Cache["django.core.cache"] : one document per task
+    Index ..> Progress : counts entities indexed
+    GroundTruth ..> Progress : counts genres asked about
+    EvaluationRunner ..> Progress : counts cases scored
+```
+
+`Progress` reports nowhere by default, so a `make` target pays nothing for it and no class below
+has to know whether anybody is watching.
+
 ## Entry points
 
 The `uv` scripts became `manage.py` subcommands, wired through `services.py`:
