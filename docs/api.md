@@ -5,7 +5,7 @@ answering them and scoring those answers. Each endpoint runs the project's own c
 code the equivalent command runs, so there is one way of ingesting and one way of evaluating however
 it was asked for.
 
-Served by the `api` compose service on port 8000, with no authentication of any kind. The
+Served by the `app` compose service on port 8000, with no authentication of any kind. The
 documentation, and the engines it offers to pick from, are at
 [localhost:8000/docs](http://localhost:8000/docs).
 
@@ -82,7 +82,7 @@ A failure says which target to run by hand:
  "info": "There was an error ingesting data. Please run make ingest in the server for more details."}
 ```
 
-The reason itself is in the `api` service's log, in full, where `docker compose logs api` finds it.
+The reason itself is in the `app` service's log, in full, where `docker compose logs app` finds it.
 
 ## How far the progress goes
 
