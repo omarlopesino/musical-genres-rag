@@ -543,6 +543,7 @@ dependencies = [
     { name = "pydantic-evals" },
     { name = "redis" },
     { name = "streamlit" },
+    { name = "tenacity" },
 ]
 
 [package.metadata]
@@ -557,6 +558,7 @@ requires-dist = [
     { name = "pydantic-evals", specifier = ">=2.18.0" },
     { name = "redis", specifier = ">=8.0.1" },
     { name = "streamlit", specifier = ">=1.60.0" },
+    { name = "tenacity", specifier = ">=9.0.0" },
 ]
 
 [[package]]
