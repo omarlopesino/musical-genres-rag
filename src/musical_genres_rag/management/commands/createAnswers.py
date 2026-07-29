@@ -6,5 +6,8 @@ class Command(EngineCommand):
     help = 'Create ground truth answers via RAG.'
 
     def handle(self, *args, **options):
-        attachment = buildGroundTruthAnswers(options['engine']).generate()
-        self.stdout.write(self.style.SUCCESS('Ground truth answers written to {path}.'.format(path = attachment.getPath())))
+        [attachment, answers] = buildGroundTruthAnswers(options['engine']).generate()
+        self.stdout.write(self.style.SUCCESS('Ground truth answers written to {path}, {answers} questions answered.'.format(
+            path = attachment.getPath(),
+            answers = answers,
+        )))

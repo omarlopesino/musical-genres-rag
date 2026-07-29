@@ -14,5 +14,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        attachment = buildGenresGroundTruth().generate(options['output'])
-        self.stdout.write(self.style.SUCCESS('Ground truth written to {path}.'.format(path = attachment.getPath())))
+        [attachment, questions] = buildGenresGroundTruth().generate(options['output'])
+        self.stdout.write(self.style.SUCCESS('Ground truth written to {path}, {questions} questions generated.'.format(
+            path = attachment.getPath(),
+            questions = questions,
+        )))

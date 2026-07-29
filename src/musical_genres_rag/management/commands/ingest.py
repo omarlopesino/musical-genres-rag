@@ -6,5 +6,8 @@ class Command(EngineCommand):
     help = 'Rebuilds the search index from every stored genre.'
 
     def handle(self, *args, **options):
-        buildGenresIndex(options['engine']).index()
-        self.stdout.write(self.style.SUCCESS('Index rebuilt for {engine}.'.format(engine = options['engine'])))
+        genres = buildGenresIndex(options['engine']).index()
+        self.stdout.write(self.style.SUCCESS('Index rebuilt for {engine}, {genres} genres indexed.'.format(
+            engine = options['engine'],
+            genres = genres,
+        )))
