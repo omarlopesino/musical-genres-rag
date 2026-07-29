@@ -8,8 +8,9 @@ from openai import OpenAI
 import pandas
 
 from pydantic_evals import Case, Dataset
-from pydantic_evals.evaluators import Evaluator, EvaluatorContext
+from pydantic_evals.evaluators import Evaluator, EvaluatorContext, LLMJudge
 from pydantic_evals.reporting import EvaluationReportAdapter
+from tenacity import stop_after_attempt, wait_exponential
 
 import csv
 import json
@@ -24,6 +25,17 @@ ID_COLUMN = 'id'
 RESERVED_COLUMNS = (ID_COLUMN, QUESTION_COLUMN)
 
 MODEL = 'gpt-5.4-mini'
+
+# How many cases are scored at once. An evaluator that calls an LLM is bound by what the provider
+# accepts per minute, not by how fast the cases can be read.
+MAX_CONCURRENCY = 4
+
+# How an evaluator that raises is retried, so a call refused for arriving too soon is made again
+# rather than leaving its case unscored.
+EVALUATOR_RETRIES = {
+    'stop': stop_after_attempt(4),
+    'wait': wait_exponential(multiplier = 2, max = 30),
+}
 
 """Every generated file carries the moment it was written, so runs never overwrite each other"""
 def buildAttachmentPath(name, extension, directory = GROUND_TRUTH_DIRECTORY):
@@ -217,7 +229,16 @@ class EvaluationRunner:
     """The aggregate pydantic-evals computed, kept because dumping the report leaves it behind"""
     def _averages(self, report):
         averages = report.averages()
-        return averages.model_dump(mode = 'json') if averages is not None else None
+        if averages is None:
+            return None
+
+        return {**averages.model_dump(mode = 'json'), 'assertion_rates': self._assertionRates(report)}
+
+    """What each boolean evaluator scored on its own, because the aggregate rolls them all into the
+    single rate that "assertions" holds, and a reader cannot take one back out of it"""
+    def _assertionRates(self, report):
+        names = {name for case in report.cases for name in case.assertions}
+        return {name: self._averageAssertion(report, name) for name in sorted(names)}
 
     """A boolean evaluator lands in the assertions, which aggregate as one rate over every evaluator"""
     def _averageAssertion(self, report, name):
@@ -238,7 +259,11 @@ class EvaluationRunner:
             evaluators = self.evaluators,
         )
 
-        return dataset.evaluate_sync(self._getResponse)
+        return dataset.evaluate_sync(
+            self._getResponse,
+            max_concurrency = MAX_CONCURRENCY,
+            retry_evaluators = EVALUATOR_RETRIES,
+        )
 
     def _generateAllCases(self):
         cases = []
@@ -289,10 +314,24 @@ class GenresRagEvaluationRunner(EvaluationRunner):
                 HitDbRag(),
                 GenreRagGenreHit(),
                 GenreRagGenreMrr(),
+                LLMJudge(rubric = JUDGE_RUBRIC, model = JUDGE_MODEL),
             ],
         )
         self.groundTruthAnswers = requireLatestGroundTruthAnswer(attachmentsRepository, index)
         self.recordedResponses = self._loadRecordedResponses()
+        self._requirePrompts()
+
+    """A file written before prompts were recorded holds no context for the judge to read, and
+    finding that out case by case would spend a run of paid calls to score nothing"""
+    def _requirePrompts(self):
+        if any('prompt' not in response for response in self.recordedResponses):
+            raise RuntimeError(
+                'The answers in "{path}" carry no prompt, so there is no context to judge against. '
+                'Run "make createAnswers ENGINE={engine}" to record one.'.format(
+                    path = self.groundTruthAnswers.getPath(),
+                    engine = self.index.getEngineName(),
+                )
+            )
 
     def _getGroundTruthAnswers(self):
         return self.groundTruthAnswers
@@ -408,3 +447,40 @@ class GenreRagGenreMrr(Evaluator):
         if genre not in genres:
             return 0.0
         return 1 / (genres.index(genre) + 1)
+
+"""Read by the LLMJudge evaluator pydantic-evals ships, which hands the judge the whole recorded
+output as JSON and this rubric as the only instruction, so the rubric names the fields to read.
+
+Judged against the stored prompt rather than the index: what makes an answer correct is the
+context it was actually written from, not the context the same query would retrieve today.
+"""
+JUDGE_RUBRIC = '''
+The output is a JSON object recording one answer of a musical genre RAG system. Its "prompt"
+field holds the question that was asked and the whole context the system was allowed to use.
+Its "answer" field holds the response it produced. Ignore every other field.
+
+The response is correct when both of these hold:
+- It finds genres for the user.
+- The answer is related directly with the question asked in the prompt.
+
+Judge the response only against the context in the prompt. What you know about music is not
+evidence: an answer that is true in the world but unsupported by the context is incorrect, and
+a genre named in the response but absent from the context is incorrect however plausible.
+
+The context is a list of entries, each naming one genre. Only those entries are available to
+answer with. A genre that appears merely as a word inside another entry's description is not
+one of them, so do not treat it as something the response could have named. Before calling a
+response incorrect for declining, name in the "reason" field the entry you say answers the
+question, and quote the words from it you relied on. If you cannot quote them, the context does
+not answer and declining was correct.
+
+"I don't know." is correct only when the context genuinely holds no answer to the question.
+When the context does answer it, declining is incorrect. When "prompt" is null nothing was
+retrieved at all, so the user was found no genres and the response is incorrect.
+
+The question is vague on purpose and never names the genre it describes. Vague is not
+incorrect: judge whether the response found what the question described.
+'''.strip()
+
+"""The judge runs through pydantic-ai, which names a model by its provider rather than alone"""
+JUDGE_MODEL = 'openai:{model}'.format(model = MODEL)
