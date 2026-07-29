@@ -21,12 +21,27 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-only-not-for-production')
 DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() == 'true'
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# No web layer yet: no admin, auth, sessions or contenttypes until something needs them.
+# Where a finished evaluation is read, which the API hands back as the link to the run it stored.
+# The app serving that page is the "ui" service, reached by whoever called the API rather than by us.
+UI_BASE_URL = os.getenv('UI_BASE_URL', 'http://localhost:8501')
+
+# The web layer is a JSON API and nothing else: no admin, auth, sessions or contenttypes, since
+# ninja serves it without templates, cookies or a CSRF token to carry.
 INSTALLED_APPS = [
     'musical_genres_rag',
 ]
 
 MIDDLEWARE = []
+
+# The only page this project serves is the API documentation, which ninja renders through a template
+# of its own, so the backend is configured with nowhere of ours to look for one.
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': False,
+    },
+]
 
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
