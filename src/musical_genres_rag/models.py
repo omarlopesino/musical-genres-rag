@@ -161,3 +161,50 @@ class EvaluationRun(models.Model):
 
     def getAverages(self):
         return self.averages
+
+"""What was made of one answer, by the person who asked it or by a judge reading it back.
+
+Both verdicts on the same answer are the same conversation, so they share an id and are
+told apart by their source.
+"""
+class Feedback(models.Model):
+
+    class Source(models.TextChoices):
+        USER = 'user'
+        LLM = 'llm'
+
+    pk = models.CompositePrimaryKey('id', 'source')
+    # Drawn from feedback_id_seq, which the migration creates: a composite key cannot carry
+    # an AutoField, and both rows of a conversation have to be inserted under the same id
+    id = models.BigIntegerField()
+    source = models.CharField(max_length = 16, choices = Source.choices)
+    question = models.CharField(max_length = 255)
+    # The whole RagResponse.toDict(), the rendered context included, so a judge scores the
+    # answer against what the LLM was actually given
+    answer = models.JSONField()
+    # What the thumbs said, as 1 or 0
+    score = models.FloatField(null = True)
+    # Filled by nobody yet: the judge that will write these is not built
+    judgement = models.TextField(null = True)
+    relevance = models.FloatField(null = True)
+
+    class Meta:
+        db_table = 'feedback'
+
+    def getId(self):
+        return self.id
+
+    def getSource(self):
+        return self.source
+
+    def getQuestion(self):
+        return self.question
+
+    def getAnswer(self):
+        return self.answer
+
+    def getScore(self):
+        return self.score
+
+    def __str__(self):
+        return self.question

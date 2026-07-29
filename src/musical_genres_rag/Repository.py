@@ -1,4 +1,9 @@
-from musical_genres_rag.models import Attachment, EvaluationRun, Genre, Instrument
+from django.db import connection
+
+from musical_genres_rag.models import Attachment, EvaluationRun, Feedback, Genre, Instrument
+
+# The sequence migration 0009 creates, read here and nowhere else
+CONVERSATION_SEQUENCE = 'feedback_id_seq'
 
 class RepositoryBase():
 
@@ -70,7 +75,7 @@ class EvaluationRunsRepository(RepositoryBase):
             averages = averages,
         )
 
-    """The runs a dashboard filter asks for. An empty filter is no filter, so the page opens on everything"""
+    """The runs a filter asks for. An empty filter is no filter, so the page opens on everything"""
     def findFiltered(self, types = None, embeddingModels = None, since = None, until = None):
         runs = self.model.objects.all()
 
@@ -94,6 +99,39 @@ class EvaluationRunsRepository(RepositoryBase):
 
     def _getDistinct(self, field):
         return list(self.model.objects.values_list(field, flat = True).distinct().order_by(field))
+
+class FeedbackRepository(RepositoryBase):
+
+    def __init__(self):
+        super().__init__(Feedback)
+
+    """A conversation id nobody else will be given, drawn before there is a row to put it on"""
+    def nextConversation(self):
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT nextval(%s)', [CONVERSATION_SEQUENCE])
+            [conversation] = cursor.fetchone()
+
+        return conversation
+
+    """Stores what a source made of one answer.
+
+    Written as an update where the row exists, so pressing the other thumb corrects the
+    verdict rather than colliding with the key it was already stored under.
+    """
+    def save(self, conversation, source, question, answer, score = None, judgement = None, relevance = None):
+        [feedback, _] = self.model.objects.update_or_create(
+            id = conversation,
+            source = source,
+            defaults = {
+                'question': question,
+                'answer': answer,
+                'score': score,
+                'judgement': judgement,
+                'relevance': relevance,
+            },
+        )
+
+        return feedback
 
 class GenresRepository(RepositoryBase):
 
