@@ -30,14 +30,20 @@ UNKNOWN_ANSWER = "I don't know."
 
 class RagResponse:
 
-    def __init__(self, query, retrieved, response, duration):
+    def __init__(self, query, retrieved, response, duration, prompt = None):
         self.query = query
         self.retrieved = retrieved
         self.response = response
         self.duration = duration
+        self.prompt = prompt
 
     def getResponse(self):
         return self.response
+
+    """The context the answer was written from, kept so a judge scores the answer against what the
+    LLM was actually given rather than against the index as it stands today"""
+    def getPrompt(self):
+        return self.prompt
 
     """The ids the index returned, so retrieval and generation are scored over the same run"""
     def getRetrieved(self):
@@ -60,6 +66,7 @@ class RagResponse:
         return {
             "query": self.query,
             "retrieved": self.getRetrieved(),
+            "prompt": self.getPrompt(),
             "answer": self.getAnswer(),
             "duration": round(self.getDuration(), 3),
             "input_tokens": self.getInputTokens(),
@@ -137,7 +144,7 @@ class Rag:
         entities = self.repository.loadMultiple(results)
         prompt = self._buildPrompt(query, entities)
         llm_response = self._queryLlm(prompt)
-        return RagResponse(query, results, llm_response, perf_counter() - start)
+        return RagResponse(query, results, llm_response, perf_counter() - start, prompt)
 
     """Whoever holds a Rag never holds its index, so the engine it retrieved with is reachable from here"""
     def getEngineName(self):
