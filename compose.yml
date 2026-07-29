@@ -26,14 +26,14 @@ services:
     ports:
       - "6379:6379"
 
-  # The evaluation dashboard, served here rather than started by hand so the report URL an Airflow
-  # run links to keeps resolving. The Dockerfile in this repository builds the database image, so
-  # this runs the stock uv image over the sources instead of adding a second one to maintain.
-  dashboard:
-    container_name: ${PROJECT_NAME}_dashboard
+  # The chat and the evaluation reports, served here rather than started by hand so the report URL
+  # an Airflow run links to keeps resolving. The Dockerfile in this repository builds the database
+  # image, so this runs the stock uv image over the sources instead of adding a second one to maintain.
+  ui:
+    container_name: ${PROJECT_NAME}_ui
     image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
     working_dir: /app
-    command: uv run streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501
+    command: uv run streamlit run ui.py --server.address 0.0.0.0 --server.port 8501
     env_file: .env
     # settings.py loads .env without overriding, so these win over the values the host reaches
     environment:
@@ -42,7 +42,7 @@ services:
     volumes:
       - ./:/app
       # Without this the bind mount above hands the container the virtualenv built for the host
-      - mgr_dashboard_venv:/app/.venv
+      - mgr_ui_venv:/app/.venv
     ports:
       - "8501:8501"
     depends_on:
@@ -51,4 +51,4 @@ services:
 
 volumes:
   mgr_pgdata:
-  mgr_dashboard_venv:
+  mgr_ui_venv:
