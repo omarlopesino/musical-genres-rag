@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from musical_genres_rag.models import Attachment, EvaluationRun
+from musical_genres_rag.Progress import NULL_PROGRESS
 from musical_genres_rag.Rag import EmptyRagResponse, EmptyRetrievalError, UNKNOWN_ANSWER
 from musical_genres_rag.Renderer import EntityRenderer
 from typing import List, Literal
@@ -36,6 +37,13 @@ EVALUATOR_RETRIES = {
     'stop': stop_after_attempt(4),
     'wait': wait_exponential(multiplier = 2, max = 30),
 }
+
+"""What a run is spending its time on, for whoever is following it"""
+GENERATING = 'generating'
+ANSWERING = 'answering'
+SCORING = 'scoring'
+JUDGING = 'judging'
+SAVING = 'saving'
 
 """Every generated file carries the moment it was written, so runs never overwrite each other"""
 def buildAttachmentPath(name, extension, directory = GROUND_TRUTH_DIRECTORY):
@@ -99,22 +107,30 @@ class GroundTruth:
         self.responseClass = responseClass
         self.llm = OpenAI()
 
-    """Returns the attachment the questions were written to"""
-    def generate(self, outputPath = None):
-        # @todo tqdm
+    """Returns the attachment the questions were written to, and how many were written to it.
+
+    Counted per genre rather than per question, since how many questions a genre yields is only
+    known once it has been asked for.
+    """
+    def generate(self, outputPath = None, progress = NULL_PROGRESS):
         # @todo load all
         outputPath = outputPath if outputPath is not None else buildAttachmentPath('ground_truth', 'csv')
         entities = self.repository.loadMultiple()
+        progress.start(GENERATING, len(entities))
         ground_truth = []
         for entity in entities:
             entity_ground_truth = self._queryEntityGroundTruth(entity)
             for question in entity_ground_truth["questions"]:
                 ground_truth.append(question)
+            progress.advance()
         ground_truth_dataframe = pandas.DataFrame(ground_truth)
         ground_truth_dataframe.to_csv(outputPath, index = False)
 
         # No engine: the questions come straight from the repository, no index is searched
-        return self.attachmentsRepository.create(outputPath, Attachment.Type.GROUND_TRUTH)
+        return [
+            self.attachmentsRepository.create(outputPath, Attachment.Type.GROUND_TRUTH),
+            len(ground_truth),
+        ]
 
     def _queryEntityGroundTruth(self, entity):
         prompt = PROMPT.format(genre = self._renderEntity(entity))
@@ -146,31 +162,40 @@ class GroundTruthAnswers:
         self.rag = rag
         self.attachmentsRepository = attachmentsRepository
 
-    """Returns the attachment the answers were written to"""
-    def generate(self):
+    """Returns the attachment the answers were written to, and how many were written to it"""
+    def generate(self, progress = NULL_PROGRESS):
         groundTruth = requireLatestGroundTruth(self.attachmentsRepository)
         outputPath = buildAttachmentPath('ground_truth_answers', 'json')
         with open(groundTruth.getPath(), newline='') as csvfile:
             reader = csv.reader(csvfile)
             headings = next(reader)
-            responses = []
-            for row in reader:
-                [id, genre, kind, question] = row
-                response = self._answer(question)
-                responses.append({
-                    'id': id,
-                    'kind': kind,
-                    'genre': genre,
-                    **response.toDict(),
-                })
+            # Held rather than streamed, so how many questions there are is known before the first is asked
+            rows = list(reader)
+
+        progress.start(ANSWERING, len(rows))
+        responses = []
+        for row in rows:
+            [id, genre, kind, question] = row
+            response = self._answer(question)
+            responses.append({
+                'id': id,
+                'kind': kind,
+                'genre': genre,
+                **response.toDict(),
+            })
+            progress.advance()
+
         with open(outputPath, 'w') as jsonfile:
             json.dump(responses, jsonfile, indent = 2)
 
-        return self.attachmentsRepository.create(
-            outputPath,
-            Attachment.Type.GROUND_TRUTH_ANSWERS,
-            self.rag.getEngineName(),
-        )
+        return [
+            self.attachmentsRepository.create(
+                outputPath,
+                Attachment.Type.GROUND_TRUTH_ANSWERS,
+                self.rag.getEngineName(),
+            ),
+            len(responses),
+        ]
 
     """A question the index cannot answer is still a question the evaluation must score, so it is
     recorded as an unanswered one rather than aborting a run of paid calls"""
@@ -199,9 +224,11 @@ class EvaluationRunner:
         self.groundTruth = requireLatestGroundTruth(attachmentsRepository)
 
     """Returns the stored run, printed as it is written so a failed save still shows the report"""
-    def execute(self):
-        report = self._evaluate()
+    def execute(self, progress = NULL_PROGRESS):
+        report = self._evaluate(progress)
         report.print()
+        progress.enter(SAVING)
+
         return self._save(report)
 
     """What a case is scored against: a subclass either replays a recorded run or queries live"""
@@ -252,18 +279,36 @@ class EvaluationRunner:
         averages = report.averages()
         return averages.scores.get(name) if averages is not None else None
 
-    def _evaluate(self):
+    def _evaluate(self, progress = NULL_PROGRESS):
+        cases = self._generateAllCases()
+        progress.start(SCORING, len(cases))
         dataset = Dataset(
             name = self.name,
-            cases = self._generateAllCases(),
+            cases = cases,
             evaluators = self.evaluators,
         )
 
         return dataset.evaluate_sync(
-            self._getResponse,
+            self._scored(progress, len(cases)),
             max_concurrency = MAX_CONCURRENCY,
             retry_evaluators = EVALUATOR_RETRIES,
         )
+
+    """The response a case is scored on, counted as it is answered.
+
+    What is left once every case is answered is what the evaluators spend, which is the whole of a
+    RAG run: it replays answers it already paid for, so its cases fill up at once and the judging
+    that follows is reported as the phase it is rather than as a share of anything.
+    """
+    def _scored(self, progress, cases):
+        def scored(question):
+            response = self._getResponse(question)
+            if progress.advance() >= cases:
+                progress.enter(JUDGING)
+
+            return response
+
+        return scored
 
     def _generateAllCases(self):
         cases = []

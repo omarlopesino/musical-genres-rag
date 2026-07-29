@@ -1,8 +1,11 @@
 from django.db import connection
 from musical_genres_rag.Embed import TextEmbedder
+from musical_genres_rag.Progress import NULL_PROGRESS
 from psycopg import sql
 
 DEFAULT_LIMIT = 4
+
+INDEXING = 'indexing'
 
 class Index():
 
@@ -11,11 +14,15 @@ class Index():
         self.entityRepository = entityRepository
         self.limit = limit
 
-    def index(self):
+    """Returns how many entities were indexed, which is the whole of what was stored"""
+    def index(self, progress = NULL_PROGRESS):
         self.searchEngine.clearContent()
         entities = self.entityRepository.loadMultiple()
+        progress.start(INDEXING, len(entities))
         # @todo improve to make it paralelly!
-        self._indexEntityBatch(entities)
+        self._indexEntityBatch(entities, progress)
+
+        return len(entities)
 
     def search(self, query, limit = None):
         return self.searchEngine.search(query, limit if limit is not None else self.limit)
@@ -30,9 +37,10 @@ class Index():
     def getEmbeddingModel(self):
         return self.searchEngine.getEmbeddingModel()
 
-    def _indexEntityBatch(self, entities):
+    def _indexEntityBatch(self, entities, progress = NULL_PROGRESS):
         for entity in entities:
             self.searchEngine.indexEntity(entity)
+            progress.advance()
 
 class SearchEngine:
 
