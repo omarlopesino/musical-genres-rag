@@ -14,17 +14,13 @@ import streamlit as st
 
 from musical_genres_rag.models import Feedback
 from musical_genres_rag.Rag import EmptyRagResponse, EmptyRetrievalError
+from musical_genres_rag.Report import EVALUATIONS_PATH, reportUrl
 from musical_genres_rag.services import buildEvaluationRunsRepository, buildFeedbackRepository, buildGenresRag
 
 # Streamlit renders every bare expression a script leaves at module level, a docstring above a
 # function included, so everything explanatory in this file is a comment instead.
 
-# A report is reached by its own URL rather than by a click, so an Airflow task can link the run it
-# just finished. The page the app navigates to and the page Airflow links are the same one.
-REPORT_PATH = '/report'
-
-# The chat is what the app opens on, so the evaluations moved off "/" and are linked back to by name
-EVALUATIONS_PATH = '/evaluations'
+# The report URL lives in Report.py, since the API hands out the very same link this page is reached by.
 
 # What a question may be, kept at the width of the column it is stored in so the box refuses
 # what Postgres would have rejected on the way in
@@ -382,10 +378,6 @@ def toCasesFrame(cases):
 
     # Arrow cannot hold the lists a case carries, so what is left of them travels as text
     return frame.map(lambda value: ', '.join(value) if isinstance(value, list) else value)
-
-
-def reportUrl(id):
-    return '{path}?run={id}'.format(path = REPORT_PATH, id = id)
 
 
 # One row per run, carrying the link its report is reached by. What a run scored belongs to the
