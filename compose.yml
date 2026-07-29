@@ -49,6 +49,36 @@ services:
       db:
         condition: service_healthy
 
+  # What an orchestrator drives the project by. Runs from the repository root because the ground
+  # truth and its answers are written to, and read back from, paths relative to it. Autoreload is
+  # off: a reload would take with it whatever task was running in a thread of this process.
+  api:
+    container_name: ${PROJECT_NAME}_api
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+    working_dir: /app
+    command: uv run python manage.py runserver --noreload 0.0.0.0:8000
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_HOST: redis
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,api
+      # The link a finished evaluation is handed back as, read by whoever called the API rather
+      # than from inside this network, so it names the port the ui is published on.
+      UI_BASE_URL: http://localhost:8501
+    volumes:
+      - ./:/app
+      - mgr_api_venv:/app/.venv
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      # Where the progress of a running task is written, so a caller polling it reads what another
+      # process wrote
+      redis:
+        condition: service_started
+
 volumes:
   mgr_pgdata:
   mgr_ui_venv:
+  mgr_api_venv:
