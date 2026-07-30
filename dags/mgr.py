@@ -1,6 +1,7 @@
 from airflow.sdk import DAG, BaseOperatorLink, Param
 from airflow.providers.http.operators.http import HttpOperator
 from airflow.providers.http.sensors.http import HttpSensor
+from datetime import datetime, timedelta
 import attrs
 import json
 import logging
@@ -18,6 +19,20 @@ DEFAULT_PARAMS = {
         ]
     )
 }
+
+"""What the judge is run with instead. It searches no index, so it is told how much to read rather
+than what to read it through: every answer it reads is a paid call, and a run every five minutes is
+bounded by this rather than by how much feedback has arrived since the last one."""
+JUDGE_PARAMS = {
+    "limit": Param(
+        100,
+        type = "integer",
+        minimum = 1
+    )
+}
+
+# Any moment already past will do: nothing is caught up on, so this only says the schedule has begun
+SCHEDULE_START = datetime(2026, 1, 1)
 
 def OperationResponseCheck(response):
     log.info(response.json())
@@ -60,6 +75,30 @@ def AttachmentFinishedCheck(response, task_instance):
     link = (response["result"] or {}).get("link")
     if link:
         log.info("Attachment: " + link)
+        task_instance.xcom_push(key = "attachment_url", value = link)
+
+    return True
+
+"""Waits for the operation to be over, logs how much of it there turned out to be, and keeps the
+link to what it wrote.
+
+For the operations that produce rows rather than a file: the count is what they did, and the link
+is where the rows they touched are read back.
+"""
+def TotalFinishedCheck(response, task_instance):
+    response = response.json()
+    log.info(response)
+    log.info("Progress: " + str(response["percent"]) + "%")
+
+    if not response["done"]:
+        return False
+
+    result = response["result"] or {}
+    log.info("Total processed: " + str(result.get("total")))
+
+    link = result.get("link")
+    if link:
+        log.info("Judgements: " + link)
         task_instance.xcom_push(key = "attachment_url", value = link)
 
     return True
@@ -242,3 +281,48 @@ with DAG(
     )
 
     evaluate_rag >> progress
+
+"""
+Judges the answers people left feedback on.
+
+The only dag that runs itself: feedback arrives whenever somebody presses a thumb, so this reads
+what has arrived every five minutes rather than waiting to be asked. One run at a time, and no
+catching up on the schedules that passed while it was off — what is pending is pending whenever
+the next run starts, and reading it twice would only spend the calls twice.
+"""
+with DAG(
+    dag_id="feedback_judge",
+    dag_display_name="6. Feedback judge",
+    params = JUDGE_PARAMS,
+    description="Scores the answers people left feedback on",
+    schedule = timedelta(minutes = 5),
+    start_date = SCHEDULE_START,
+    catchup = False,
+    max_active_runs = 1,
+    tags = ["musical_genres_rag"]
+) as dag:
+    feedback_judge = HttpOperator(
+        task_id="feedback_judge",
+        http_conn_id=HTTP_CONN_ID,
+        method="POST",
+        endpoint="/feedback-judge",
+        data=json.dumps({"limit": "{{ params.limit }}"}),
+        headers={"Content-Type": "application/json"},
+        response_check=OperationResponseCheck,
+        response_filter=lambda response: response.json()["task_id"],
+        dag=dag,
+    )
+
+    progress = LinkedHttpSensor(
+        task_id="feedback_judge_finished",
+        link_name="Judgements",
+        method="GET",
+        http_conn_id=HTTP_CONN_ID,
+        endpoint="/progress/{{ ti.xcom_pull(task_ids='feedback_judge') }}",
+        request_params={},
+        response_check=TotalFinishedCheck,
+        poke_interval=5,
+        dag=dag,
+    )
+
+    feedback_judge >> progress
