@@ -98,7 +98,7 @@ def TotalFinishedCheck(response, task_instance):
 
     link = result.get("link")
     if link:
-        log.info("Judgements: " + link)
+        log.info("Feedback: " + link)
         task_instance.xcom_push(key = "attachment_url", value = link)
 
     return True
@@ -315,7 +315,7 @@ with DAG(
 
     progress = LinkedHttpSensor(
         task_id="feedback_judge_finished",
-        link_name="Judgements",
+        link_name="Feedback",
         method="GET",
         http_conn_id=HTTP_CONN_ID,
         endpoint="/progress/{{ ti.xcom_pull(task_ids='feedback_judge') }}",

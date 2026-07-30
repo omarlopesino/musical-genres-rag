@@ -10,7 +10,7 @@ from pydantic import Field
 
 from musical_genres_rag.Feedback import DEFAULT_LIMIT
 from musical_genres_rag.Progress import CacheProgress, readProgress
-from musical_genres_rag.Report import judgementsUrl, reportUrl
+from musical_genres_rag.Report import batchFeedbackUrl, reportUrl
 from musical_genres_rag.services import (
     DEFAULT_ENGINE,
     ENGINES,
@@ -364,7 +364,7 @@ def judging(limit):
             'total': total,
             'success': True,
             'info': FEEDBACK_JUDGE_SUCCESS,
-            'link': judgementsUrl(batch.getId(), settings.UI_BASE_URL) if batch is not None else None,
+            'link': batchFeedbackUrl(batch.getId(), settings.UI_BASE_URL) if batch is not None else None,
         }
 
     return work

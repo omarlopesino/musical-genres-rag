@@ -18,8 +18,8 @@ from musical_genres_rag.Report import (
     BATCH_PARAM,
     CONVERSATION_PARAM,
     EVALUATIONS_PATH,
-    JUDGEMENTS_PATH,
-    feedbackUrl,
+    FEEDBACK_PATH,
+    conversationFeedbackUrl,
     reportUrl,
 )
 from musical_genres_rag.services import (
@@ -192,7 +192,7 @@ CONVERSATION_LABELS = {
 # The prose of a conversation, held narrow so the date and the link keep their place on the row
 NARROW_CONVERSATIONS = ['question', 'answer']
 
-JUDGEMENT_LABELS = {
+FEEDBACK_LABELS = {
     'id': 'id',
     'question': 'question',
     'answer': 'answer',
@@ -202,28 +202,33 @@ JUDGEMENT_LABELS = {
 
 # Held narrow: an answer and the judgement of it are both prose, and either would take the width
 # from the rest of the row on its own
-NARROW_JUDGEMENTS = ['answer', 'relevance', 'judgement']
+NARROW_FEEDBACK = ['answer', 'relevance', 'judgement']
 
-# What the judgements page is narrowed to comes off the url under the names Report.py writes its
+# What the feedback page is narrowed to comes off the url under the names Report.py writes its
 # links with, so the end that reads them and the end that builds them cannot drift apart.
 
 CONVERSATIONS_CAPTION = 'Every question put to the RAG and what came back, newest first.'
-JUDGEMENTS_CAPTION = 'What a judge made of the answers people left feedback on, newest first.'
-BATCH_CAPTION = 'What the judge run of {date} made of the answers it read, newest first.'
-CONVERSATION_CAPTION = 'What was made of the answer given on {date}.'
+# The rows are what people said of the answers they were given. A judge reads the same answers back
+# and writes beside them, which is why two of the columns are empty until it has.
+FEEDBACK_CAPTION = 'The feedback people left on the answers they were given, newest first, and what a judge made of the same answers.'
+BATCH_CAPTION = 'The feedback the judge run of {date} read, and what it made of it.'
+CONVERSATION_CAPTION = 'The feedback left on the answer given on {date}.'
 
-EMPTY_JUDGEMENTS = 'No answer has been judged in these dates yet.'
+EMPTY_FEEDBACK = 'Nobody has left feedback in these dates yet.'
 # Read where a conversation is what the page was narrowed to: its feedback exists, or the link
-# leading here would not have been offered, and nobody has judged it yet
-EMPTY_CONVERSATION = 'Nobody has judged the feedback left on this conversation yet.'
+# leading here would not have been offered, so only the dates can be hiding it
+EMPTY_CONVERSATION = 'The feedback left on this conversation falls outside these dates.'
 
-# What the judgements are read under, each with what it means underneath it
-JUDGEMENT_SUMMARY = [
+# What the feedback is read under, each with what it means underneath it
+FEEDBACK_SUMMARY = [
     ('Positive', 'positive', 'Share of the thumbs pressed that were up'),
     ('Average relevance', 'relevance', 'What a judge made of the answers, on average'),
     ('Judgements', 'judgements', 'Answers a judge has read back'),
     ('Feedbacks', 'feedbacks', 'Answers somebody left feedback on, judged or not'),
 ]
+
+# Where a number or a verdict is not there to be shown, rather than a bare "None"
+UNSET = '—'
 
 # Under this a slice is too thin to carry its own label without landing on its neighbour's
 MINIMUM_LABEL = 0.08
@@ -296,7 +301,7 @@ def donut(slices, scale):
 
 # A run that never scored one shows a dash rather than a bare "None"
 def formatScore(score):
-    return '{score:.2f}'.format(score = score) if score is not None else '—'
+    return '{score:.2f}'.format(score = score) if score is not None else UNSET
 
 
 # The same, for the shares that are read as a percentage: nothing was pressed, so there is no share
@@ -454,7 +459,7 @@ def toConversationsFrame(conversations):
             'question': conversation.getQuestion(),
             'answer': conversation.getAnswer()['answer']['answer'],
             'created': conversation.getCreated().strftime(FULL_DATE_FORMAT),
-            'feedback': feedbackUrl(conversation.getId()) if conversation.getFeedback() else None,
+            'feedback': conversationFeedbackUrl(conversation.getId()) if conversation.getFeedback() else None,
         }
         for conversation in conversations
     ]
@@ -462,22 +467,25 @@ def toConversationsFrame(conversations):
     return pandas.DataFrame(rows).rename(columns = CONVERSATION_LABELS)
 
 
-# One row per judged answer. The answer is the prose the LLM wrote and not the whole response stored
-# beside it: the context it was written from is thousands of characters, kept for a judge to read and
-# not for a cell.
-def toJudgementsFrame(feedbacks):
+# One row per feedback left, whether a judge has read it back or not. The answer is the prose the
+# LLM wrote and not the whole response stored beside it: the context it was written from is
+# thousands of characters, kept for a judge to read and not for a cell.
+#
+# The two columns a judge fills carry a dash until it has, so a row waiting to be judged reads as
+# one nobody has got to yet rather than as one with something missing from it.
+def toFeedbackFrame(feedbacks):
     rows = [
         {
             'id': feedback.getId(),
             'question': feedback.getConversation().getQuestion(),
             'answer': feedback.getConversation().getAnswer()['answer']['answer'],
             'relevance': formatScore(feedback.getRelevance()),
-            'judgement': feedback.getJudgement(),
+            'judgement': feedback.getJudgement() or UNSET,
         }
         for feedback in feedbacks
     ]
 
-    return pandas.DataFrame(rows).rename(columns = JUDGEMENT_LABELS)
+    return pandas.DataFrame(rows).rename(columns = FEEDBACK_LABELS)
 
 
 # One row per run, carrying the link its report is reached by. What a run scored belongs to the
@@ -637,14 +645,14 @@ def chat():
     renderAnswer()
 
 
-# The judgements read at a glance, over the same days the table below shows. The thumbs are stored
-# as 1 and 0, so the share of them that were up is the mean of them; the two totals differ because a
-# feedback nobody has judged yet is still a feedback.
-def renderJudgementSummary(summary):
+# The feedback read at a glance, over the same days the table below shows. The thumbs are stored as
+# 1 and 0, so the share of them that were up is the mean of them; the two totals differ because a
+# feedback nobody has judged yet is still a feedback, and the table below now shows both.
+def renderFeedbackSummary(summary):
     st.markdown(SUMMARY_STYLE, unsafe_allow_html = True)
 
     shown = {'positive': formatShare, 'relevance': formatScore}
-    for column, [label, name, tooltip] in zip(st.columns(len(JUDGEMENT_SUMMARY)), JUDGEMENT_SUMMARY):
+    for column, [label, name, tooltip] in zip(st.columns(len(FEEDBACK_SUMMARY)), FEEDBACK_SUMMARY):
         value = shown[name](summary[name]) if name in shown else summary[name]
         column.metric(label, value, help = tooltip)
 
@@ -677,8 +685,8 @@ def conversations():
 
 
 # What the page is narrowed to, and what it says of itself while it is. A judge run and a
-# conversation each name themselves in the url; neither, and the page is all of the judgements.
-def judgementsHeading(batch, conversation):
+# conversation each name themselves in the url; neither, and the page is all of the feedback.
+def feedbackHeading(batch, conversation):
     if batch is not None:
         return [
             'Judge run {batch}'.format(batch = batch.getId()),
@@ -691,10 +699,10 @@ def judgementsHeading(batch, conversation):
             CONVERSATION_CAPTION.format(date = conversation.getCreated().strftime(FULL_DATE_FORMAT)),
         ]
 
-    return ['Judgements', JUDGEMENTS_CAPTION]
+    return ['Feedback', FEEDBACK_CAPTION]
 
 
-def judgements():
+def feedback():
     askedBatch = st.query_params.get(BATCH_PARAM)
     askedConversation = st.query_params.get(CONVERSATION_PARAM)
     batch = loadNamed(askedBatch, batchRepository)
@@ -703,35 +711,36 @@ def judgements():
     named = [(askedBatch, batch, 'judge run'), (askedConversation, conversation, 'conversation')]
     for asked, found, what in named:
         if asked is not None and found is None:
-            st.title('Judgements')
-            st.warning('That {what} does not exist. Read all of the judgements instead.'.format(what = what))
-            st.link_button('Back to all the judgements', JUDGEMENTS_PATH)
+            st.title('Feedback')
+            st.warning('That {what} does not exist. Read all of the feedback instead.'.format(what = what))
+            st.link_button('Back to all the feedback', FEEDBACK_PATH)
             return
 
-    [title, caption] = judgementsHeading(batch, conversation)
+    [title, caption] = feedbackHeading(batch, conversation)
     st.title(title)
     st.caption(caption)
 
-    # The dates narrow a run the same way they narrow everything, so a run is still read by day
+    # The dates narrow a run the same way they narrow everything, so a run is still read by day.
+    # They are the days the feedback was left on, which is not the day a judge got to it.
     [dateColumn, *_] = st.columns(3)
-    dates = dateColumn.date_input('Judged between', value = ())
+    dates = dateColumn.date_input('Left between', value = ())
 
     # The picker hands back nothing, one date or both, depending on how far through it the user is
     [since, until] = [*dates, None, None][:2]
 
     if batch is not None or conversation is not None:
-        st.link_button('Back to all the judgements', JUDGEMENTS_PATH)
+        st.link_button('Back to all the feedback', FEEDBACK_PATH)
 
-    renderJudgementSummary(feedbackRepository.getJudgementSummary(since, until, batch, conversation))
+    renderFeedbackSummary(feedbackRepository.getFeedbackSummary(since, until, batch, conversation))
 
-    feedbacks = feedbackRepository.findJudged(since, until, batch, conversation)
+    feedbacks = feedbackRepository.findFiltered(since, until, batch, conversation)
     if not feedbacks:
-        st.info(EMPTY_CONVERSATION if conversation is not None else EMPTY_JUDGEMENTS)
+        st.info(EMPTY_CONVERSATION if conversation is not None else EMPTY_FEEDBACK)
         return
 
     renderTable(
-        toJudgementsFrame(feedbacks),
-        column_config = narrowColumns(NARROW_JUDGEMENTS, JUDGEMENT_LABELS),
+        toFeedbackFrame(feedbacks),
+        column_config = narrowColumns(NARROW_FEEDBACK, FEEDBACK_LABELS),
     )
 
 
@@ -783,7 +792,7 @@ def report():
 st.navigation([
     st.Page(chat, title = 'Chat', default = True),
     st.Page(conversations, title = 'Conversations', url_path = 'conversations'),
-    st.Page(judgements, title = 'Judgements', url_path = 'judgements'),
+    st.Page(feedback, title = 'Feedback', url_path = 'feedback'),
     st.Page(selection, title = 'Evaluations', url_path = 'evaluations'),
     st.Page(report, title = 'Report', url_path = 'report'),
 ]).run()

@@ -10,11 +10,11 @@ REPORT_PATH = '/report'
 # The chat is what the app opens on, so the evaluations moved off "/" and are linked back to by name
 EVALUATIONS_PATH = '/evaluations'
 
-# Where the answers a judge has read are read back, all of them or one run's worth
-JUDGEMENTS_PATH = '/judgements'
+# Where what was made of the answers is read back, all of it or one run's worth
+FEEDBACK_PATH = '/feedback'
 
-# What narrows the judgements to a run or to a single conversation. Written into the links below
-# and read back off the url by the page itself, so both ends name it from here.
+# What narrows that page to a run or to a single conversation. Written into the links below and
+# read back off the url by the page itself, so both ends name it from here.
 BATCH_PARAM = 'batch'
 CONVERSATION_PARAM = 'conversation'
 
@@ -26,18 +26,18 @@ def reportUrl(id, baseUrl = ''):
         id = id,
     )
 
-"""The same page a judge run links to, narrowed to the answers that run read"""
-def judgementsUrl(batch, baseUrl = ''):
-    return _narrowedJudgements(BATCH_PARAM, batch, baseUrl)
+"""The feedback page a judge run links to, narrowed to the answers that run read"""
+def batchFeedbackUrl(batch, baseUrl = ''):
+    return _narrowedFeedback(BATCH_PARAM, batch, baseUrl)
 
 """The same page again, narrowed to the feedback left on one conversation"""
-def feedbackUrl(conversation, baseUrl = ''):
-    return _narrowedJudgements(CONVERSATION_PARAM, conversation, baseUrl)
+def conversationFeedbackUrl(conversation, baseUrl = ''):
+    return _narrowedFeedback(CONVERSATION_PARAM, conversation, baseUrl)
 
-def _narrowedJudgements(parameter, id, baseUrl):
+def _narrowedFeedback(parameter, id, baseUrl):
     return '{base}{path}?{parameter}={id}'.format(
         base = baseUrl.rstrip('/'),
-        path = JUDGEMENTS_PATH,
+        path = FEEDBACK_PATH,
         parameter = parameter,
         id = id,
     )

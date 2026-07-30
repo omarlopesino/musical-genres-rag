@@ -76,11 +76,11 @@ Once `done`, `result` carries what the operation was asked to report:
 | ground-truth | `{"generated": 590, "success": true, "info": "...", "link": "http://localhost:8000/attachments/12"}` |
 | create-answers | `{"answered": 590, "success": true, "info": "...", "link": "http://localhost:8000/attachments/13"}` |
 | evaluate-rag, evaluate-retrieval | `{"success": true, "info": "...", "link": "http://localhost:8501/report?run=21"}` |
-| feedback-judge | `{"total": 3, "success": true, "info": "...", "link": "http://localhost:8501/judgements?batch=7"}` |
+| feedback-judge | `{"total": 3, "success": true, "info": "...", "link": "http://localhost:8501/feedback?batch=7"}` |
 
 `feedback-judge` writes its verdicts onto the feedback rows it read, and opens a judge batch naming
 that run so those rows are read back together: `total` is how many it judged and `link` is the
-judgements page narrowed to them. A run that found nothing pending opens no batch, so it reports
+feedback page narrowed to them. A run that found nothing pending opens no batch, so it reports
 `0` and links nowhere.
 
 `link` is where what the run produced is read. For the two evaluations that is the run's own page on

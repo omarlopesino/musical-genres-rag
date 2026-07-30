@@ -149,23 +149,26 @@ class FeedbackRepository(RepositoryBase):
 
         return feedback
 
-    """The answers a judge has read, newest first, of the run and over the days asked for.
+    """The feedback left, newest first, of the run and over the days asked for.
+
+    Everything left, whether a judge has read it back yet or not: what somebody said of an answer
+    is worth reading before anything else has been made of it.
 
     An empty filter is no filter, so the page opens on everything. Ties break on id so two
-    answers given inside the same second still order deterministically.
+    verdicts left inside the same second still order deterministically.
     """
-    def findJudged(self, since = None, until = None, batch = None, conversation = None):
-        judged = self._filtered(since, until, batch, conversation).select_related('conversation').filter(judgement__isnull = False)
+    def findFiltered(self, since = None, until = None, batch = None, conversation = None):
+        feedbacks = self._filtered(since, until, batch, conversation).select_related('conversation')
 
-        return list(judged.order_by('-created', '-id'))
+        return list(feedbacks.order_by('-created', '-id'))
 
-    """The four numbers the judgements are read under, worked out where the rows are.
+    """The four numbers the feedback is read under, worked out where the rows are.
 
     The thumbs are stored as 1 and 0, so their mean is the share of them that were positive.
     An average ignores the rows that never had one, and a count of judgements ignores the rows
     nobody has judged, which is what tells the two totals apart.
     """
-    def getJudgementSummary(self, since = None, until = None, batch = None, conversation = None):
+    def getFeedbackSummary(self, since = None, until = None, batch = None, conversation = None):
         return self._filtered(since, until, batch, conversation).aggregate(
             positive = Avg('score'),
             relevance = Avg('relevance'),
