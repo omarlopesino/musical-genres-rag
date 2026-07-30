@@ -8,12 +8,14 @@ from django.http import FileResponse
 from ninja import NinjaAPI, Schema
 from pydantic import Field
 
+from musical_genres_rag.Feedback import DEFAULT_LIMIT
 from musical_genres_rag.Progress import CacheProgress, readProgress
-from musical_genres_rag.Report import reportUrl
+from musical_genres_rag.Report import judgementsUrl, reportUrl
 from musical_genres_rag.services import (
     DEFAULT_ENGINE,
     ENGINES,
     buildAttachmentsRepository,
+    buildFeedbackRelevanceJudge,
     buildGenresGroundTruth,
     buildGenresIndex,
     buildGenresRagEvaluationRunner,
@@ -42,6 +44,7 @@ GROUND_TRUTH = 'ground-truth'
 CREATE_ANSWERS = 'create-answers'
 EVALUATE_RAG = 'evaluate-rag'
 EVALUATE_RETRIEVAL = 'evaluate-retrieval'
+FEEDBACK_JUDGE = 'feedback-judge'
 
 # Where the files those operations write are downloaded from, one id per registered attachment
 ATTACHMENTS_PATH = '/attachments'
@@ -94,6 +97,16 @@ EVALUATE_RETRIEVAL_FAILURE = {
     'link': None,
 }
 
+"""The only operation with no target of its own to point a failure at: nothing generates the
+feedback it reads but the people leaving it, so its reason is only ever in the server's log."""
+FEEDBACK_JUDGE_SUCCESS = 'The feedback has been judged successfully.'
+FEEDBACK_JUDGE_FAILURE = {
+    'total': 0,
+    'success': False,
+    'info': 'There was an error judging the feedback. Please read the app log in the server for more details.',
+    'link': None,
+}
+
 BUSY = 'Another {operation} is already running as task "{task}". Wait for it to finish before starting this one.'
 UNKNOWN = 'No task "{task}" was ever started here, or it is old enough to have been forgotten.'
 
@@ -116,6 +129,11 @@ class TaskRequest(Schema):
 
 class EngineRequest(TaskRequest):
     engine: Engine = Engine(DEFAULT_ENGINE)
+
+"""How many answers one run may read. Every one of them is a paid call, so a caller that runs this
+on a schedule bounds what a run costs rather than letting it read whatever has piled up."""
+class JudgeRequest(TaskRequest):
+    limit: int = Field(default = DEFAULT_LIMIT, ge = 1)
 
 class Accepted(Schema):
     task_id: str
@@ -173,6 +191,10 @@ def evaluateRetrieval(request, payload: EngineRequest):
         evaluating(buildGenresRetrievalEvaluationRunner, payload.engine.value, EVALUATE_RETRIEVAL_SUCCESS),
         EVALUATE_RETRIEVAL_FAILURE,
     )
+
+@api.post('/feedback-judge', response = STARTED, summary = 'Score the answers people left feedback on')
+def feedbackJudge(request, payload: JudgeRequest):
+    return dispatch(FEEDBACK_JUDGE, payload, judging(payload.limit), FEEDBACK_JUDGE_FAILURE)
 
 """How far a task got, and what it left behind once it is done.
 
@@ -318,5 +340,31 @@ def evaluating(runner, engine, info):
         run = runner(engine).execute(progress)
 
         return {'success': True, 'info': info, 'link': reportUrl(run.id, settings.UI_BASE_URL)}
+
+    return work
+
+"""Reads back every answer somebody left feedback on and nobody has judged yet, and writes down what
+a judge made of each.
+
+Takes no engine: an answer is judged against the context it was written from, which the feedback row
+carries, so nothing is retrieved and no index is searched.
+
+Reads the oldest waiting first, and no more of them than it was asked for, so what one run costs is
+bounded however much feedback has piled up since the last.
+
+The link is the batch's own page on the app serving the reports, narrowed to the answers this run
+read. A run that found nothing pending opened no batch and links nowhere, exactly as a run that
+failed writes none.
+"""
+def judging(limit):
+    def work(progress):
+        [batch, total] = buildFeedbackRelevanceJudge().score(progress, limit)
+
+        return {
+            'total': total,
+            'success': True,
+            'info': FEEDBACK_JUDGE_SUCCESS,
+            'link': judgementsUrl(batch.getId(), settings.UI_BASE_URL) if batch is not None else None,
+        }
 
     return work

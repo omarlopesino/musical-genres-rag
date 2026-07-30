@@ -1,7 +1,8 @@
 from musical_genres_rag.Evaluation import GenreQuestionsGroundTruth, GenresRagEvaluationRunner, GenresRetrievalEvaluationRunner, GroundTruthAnswers
+from musical_genres_rag.Feedback import FeedbackRelevanceJudge
 from musical_genres_rag.Index import Index, PostgresSearchEngine
 from musical_genres_rag.Rag import GenresRag
-from musical_genres_rag.Repository import AttachmentsRepository, EvaluationRunsRepository, FeedbackRepository, GenresRepository
+from musical_genres_rag.Repository import AttachmentsRepository, ConversationsRepository, EvaluationRunsRepository, FeedbackRepository, GenresRepository, JudgeBatchRepository
 
 GENRE_INDEX_TABLE = 'genre_index'
 
@@ -44,8 +45,17 @@ def buildGenresGroundTruth():
 def buildEvaluationRunsRepository():
     return EvaluationRunsRepository()
 
+def buildConversationsRepository():
+    return ConversationsRepository()
+
 def buildFeedbackRepository():
     return FeedbackRepository()
+
+def buildJudgeBatchRepository():
+    return JudgeBatchRepository()
+
+def buildFeedbackRelevanceJudge():
+    return FeedbackRelevanceJudge(buildFeedbackRepository(), buildJudgeBatchRepository())
 
 def buildGenresRagEvaluationRunner(engine = DEFAULT_ENGINE):
     return GenresRagEvaluationRunner(

@@ -22,6 +22,7 @@ task it is followed by; what the work produced is read afterwards from `/progres
 | `POST` | `/create-answers` | `engine`, `task_id` | Answers those questions through the RAG and records what came back |
 | `POST` | `/evaluate-rag` | `engine`, `task_id` | Scores the whole pipeline over the answers recorded |
 | `POST` | `/evaluate-retrieval` | `engine`, `task_id` | Scores the index alone, live, with no LLM call |
+| `POST` | `/feedback-judge` | `limit`, `task_id` | Scores the answers people left feedback on, one call each |
 | `GET` | `/progress/{task_id}` | — | Says how far a task got, and what it left behind |
 | `GET` | `/attachments/{id}` | — | Downloads a file the ground truth or the answers wrote |
 
@@ -29,9 +30,15 @@ Both body fields are optional, and a body of `{}` is a valid request:
 
 - `engine` is one of the engines the project knows, `postgres_text` today, defaulting to it. It is
   the same list `--engine` takes on the command line. `/ground-truth` takes none, because the
-  questions come straight from the repository and no index is searched.
+  questions come straight from the repository and no index is searched; neither does
+  `/feedback-judge`, which reads an answer back against the context the feedback row already
+  carries.
 - `task_id` is the caller's own name for the run, so it knows where to poll before the POST returns.
   Anything matching `[A-Za-z0-9._-]{1,128}`; one is invented when it is left out.
+- `limit`, on `/feedback-judge` alone, is how many answers that run may read, 100 by default. Every
+  one of them is a paid call, so a run is bounded by what it may spend rather than by how much
+  feedback has arrived since the last one; the oldest waiting go first and the rest wait for the
+  next run.
 
 ```bash
 curl -X POST localhost:8000/ingest \
@@ -69,10 +76,17 @@ Once `done`, `result` carries what the operation was asked to report:
 | ground-truth | `{"generated": 590, "success": true, "info": "...", "link": "http://localhost:8000/attachments/12"}` |
 | create-answers | `{"answered": 590, "success": true, "info": "...", "link": "http://localhost:8000/attachments/13"}` |
 | evaluate-rag, evaluate-retrieval | `{"success": true, "info": "...", "link": "http://localhost:8501/report?run=21"}` |
+| feedback-judge | `{"total": 3, "success": true, "info": "...", "link": "http://localhost:8501/judgements?batch=7"}` |
+
+`feedback-judge` writes its verdicts onto the feedback rows it read, and opens a judge batch naming
+that run so those rows are read back together: `total` is how many it judged and `link` is the
+judgements page narrowed to them. A run that found nothing pending opens no batch, so it reports
+`0` and links nowhere.
 
 `link` is where what the run produced is read. For the two evaluations that is the run's own page on
-the Streamlit app, the same one its list of runs links to. For `ground-truth` and `create-answers` it
-is the file itself, downloaded from this API, and null when the run failed and wrote none.
+the Streamlit app, the same one its list of runs links to, and for `feedback-judge` its batch's page
+on the same app. For `ground-truth` and `create-answers` it is the file itself, downloaded from this
+API, and null when the run failed and wrote none.
 
 ## Downloading a generated file
 
@@ -96,7 +110,8 @@ the API, which is somewhere else entirely.
 once a run is `done` and not `success` — so a caller that only watches what it polls still fails on
 it. **404** for a task nobody started, or one finished over an hour ago and since forgotten.
 
-A failure says which target to run by hand:
+A failure says which target to run by hand, or where to read it for the one operation that has no
+target of its own:
 
 ```json
 {"done": true, "success": false,
@@ -113,6 +128,9 @@ The reason itself is in the `app` service's log, in full, where `docker compose 
 - **evaluate-rag** replays answers `create-answers` already paid for, so its cases fill up almost at
   once and the rest of the run is the `judging` phase — reported as the phase it is, and not as a
   share of anything.
+- **feedback-judge** counts the answers it took to read, one LLM call each — the oldest waiting, up
+  to `limit` of them. It judges none at all when there are none: a second run right behind the first
+  spends nothing and reports `0`.
 
 ## From Airflow
 
@@ -159,6 +177,10 @@ ingest → ground-truth → create-answers → evaluate-rag
 `evaluate-rag` needs the answers file `create-answers` writes for that engine, and refuses to start
 without one. `evaluate-retrieval` needs neither answers nor an LLM call, so it may be run against an
 engine as often as the engine changes.
+
+`feedback-judge` belongs to no pass at all: it reads what people have left since the last time it
+ran, so it is the one operation the orchestrator runs on a clock — every five minutes, one run at a
+time, catching up on nothing it slept through.
 
 ## What it does not do
 

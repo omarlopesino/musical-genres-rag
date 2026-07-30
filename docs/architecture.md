@@ -105,6 +105,7 @@ classDiagram
         +generating()
         +answering(engine)
         +evaluating(runner, engine, info)
+        +judging(limit)
         +download(request, attachment_id)
         +attachmentUrl(id, baseUrl)
     }
@@ -140,6 +141,9 @@ classDiagram
         +buildGroundTruthAnswers()
         +buildGenresRagEvaluationRunner()
         +buildGenresRetrievalEvaluationRunner()
+        +buildFeedbackRelevanceJudge()
+        +buildConversationsRepository()
+        +buildJudgeBatchRepository()
     }
 
     Progress <|-- CacheProgress
@@ -152,6 +156,7 @@ classDiagram
     Index ..> Progress : counts entities indexed
     GroundTruth ..> Progress : counts genres asked about
     EvaluationRunner ..> Progress : counts cases scored
+    FeedbackRelevanceJudge ..> Progress : counts answers judged
 ```
 
 `Progress` reports nowhere by default, so a `make` target pays nothing for it and no class below
