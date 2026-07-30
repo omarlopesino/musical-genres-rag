@@ -105,6 +105,8 @@ classDiagram
         +generating()
         +answering(engine)
         +evaluating(runner, engine, info)
+        +download(request, attachment_id)
+        +attachmentUrl(id, baseUrl)
     }
 
     class BackgroundTasks {

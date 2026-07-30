@@ -25,6 +25,10 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split('
 # The app serving that page is the "ui" service, reached by whoever called the API rather than by us.
 UI_BASE_URL = os.getenv('UI_BASE_URL', 'http://localhost:8501')
 
+# This very application, as whoever calls it reaches it: a generated file is handed back as a URL
+# on it, and the caller downloading that file is somewhere else, so the address cannot be our own.
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+
 # The web layer is a JSON API and nothing else: no admin, auth, sessions or contenttypes, since
 # ninja serves it without templates, cookies or a CSRF token to carry.
 INSTALLED_APPS = [

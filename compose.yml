@@ -66,6 +66,9 @@ services:
       # The link a finished evaluation is handed back as, read by whoever called the API rather
       # than from inside this network, so it names the port the ui is published on.
       UI_BASE_URL: http://localhost:8501
+      # The same, for the files the ground truth and its answers are downloaded from: this very
+      # service, named as it is published rather than as it is reached from inside the network.
+      API_BASE_URL: http://localhost:8000
     volumes:
       - ./:/app
       - mgr_app_venv:/app/.venv

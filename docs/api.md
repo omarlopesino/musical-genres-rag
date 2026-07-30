@@ -23,6 +23,7 @@ task it is followed by; what the work produced is read afterwards from `/progres
 | `POST` | `/evaluate-rag` | `engine`, `task_id` | Scores the whole pipeline over the answers recorded |
 | `POST` | `/evaluate-retrieval` | `engine`, `task_id` | Scores the index alone, live, with no LLM call |
 | `GET` | `/progress/{task_id}` | — | Says how far a task got, and what it left behind |
+| `GET` | `/attachments/{id}` | — | Downloads a file the ground truth or the answers wrote |
 
 Both body fields are optional, and a body of `{}` is a valid request:
 
@@ -65,11 +66,31 @@ Once `done`, `result` carries what the operation was asked to report:
 | Operation | `result` |
 |---|---|
 | ingest | `{"ingested": 118, "success": true, "info": "Data has been ingested sucessfully."}` |
-| ground-truth | `{"generated": 590, "success": true, "info": "..."}` |
-| create-answers | `{"answered": 590, "success": true, "info": "..."}` |
+| ground-truth | `{"generated": 590, "success": true, "info": "...", "link": "http://localhost:8000/attachments/12"}` |
+| create-answers | `{"answered": 590, "success": true, "info": "...", "link": "http://localhost:8000/attachments/13"}` |
 | evaluate-rag, evaluate-retrieval | `{"success": true, "info": "...", "link": "http://localhost:8501/report?run=21"}` |
 
-`link` is the evaluation's own page on the Streamlit app, the same one its list of runs links to.
+`link` is where what the run produced is read. For the two evaluations that is the run's own page on
+the Streamlit app, the same one its list of runs links to. For `ground-truth` and `create-answers` it
+is the file itself, downloaded from this API, and null when the run failed and wrote none.
+
+## Downloading a generated file
+
+The questions and the answers are written to files on the server, and each is registered as an
+attachment with an id of its own. `link` is that id as a URL, so a caller reads what a run wrote
+without a shell on the machine that holds it:
+
+```bash
+curl -OJ localhost:8000/attachments/12
+```
+
+The response carries the file under the name it was written as — `ground_truth_20260729-101500.csv`,
+`ground_truth_answers_20260729-104512.json` — as `text/csv` and `application/json` respectively.
+**404** answers an id nobody generated, and one whose file is no longer where it was written.
+
+Both `link`s are absolute, and name the addresses `UI_BASE_URL` and `API_BASE_URL` are set to rather
+than the ones these services answer on inside the compose network: they are read by whoever called
+the API, which is somewhere else entirely.
 
 **Status codes.** 200 while it runs and once it has succeeded. **500**, carrying that very document,
 once a run is `done` and not `success` — so a caller that only watches what it polls still fails on

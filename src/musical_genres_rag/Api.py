@@ -1,8 +1,10 @@
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from django.conf import settings
+from django.http import FileResponse
 from ninja import NinjaAPI, Schema
 from pydantic import Field
 
@@ -11,6 +13,7 @@ from musical_genres_rag.Report import reportUrl
 from musical_genres_rag.services import (
     DEFAULT_ENGINE,
     ENGINES,
+    buildAttachmentsRepository,
     buildGenresGroundTruth,
     buildGenresIndex,
     buildGenresRagEvaluationRunner,
@@ -40,6 +43,9 @@ CREATE_ANSWERS = 'create-answers'
 EVALUATE_RAG = 'evaluate-rag'
 EVALUATE_RETRIEVAL = 'evaluate-retrieval'
 
+# Where the files those operations write are downloaded from, one id per registered attachment
+ATTACHMENTS_PATH = '/attachments'
+
 RUNNING = 'running'
 
 # What a caller may name its own run: whatever needs no escaping in the URL it is then read at
@@ -63,6 +69,7 @@ GROUND_TRUTH_FAILURE = {
     'generated': 0,
     'success': False,
     'info': 'There was an error generating the ground truth. Please run make groundtruth in the server for more details.',
+    'link': None,
 }
 
 CREATE_ANSWERS_SUCCESS = 'Ground truth answers have been created successfully.'
@@ -70,6 +77,7 @@ CREATE_ANSWERS_FAILURE = {
     'answered': 0,
     'success': False,
     'info': 'There was an error creating the ground truth answers. Please run make createAnswers in the server for more details.',
+    'link': None,
 }
 
 EVALUATE_RAG_SUCCESS = 'The RAG has been evaluated successfully.'
@@ -88,6 +96,9 @@ EVALUATE_RETRIEVAL_FAILURE = {
 
 BUSY = 'Another {operation} is already running as task "{task}". Wait for it to finish before starting this one.'
 UNKNOWN = 'No task "{task}" was ever started here, or it is old enough to have been forgotten.'
+
+# A file registered but no longer on disk reads the same as one that never was: it cannot be served
+MISSING = 'No file {id} was ever generated here, or it is no longer where it was written.'
 
 # Named after the engines themselves, so the documentation offers the very list the command line takes
 Engine = Enum('Engine', {name: name for name in ENGINES})
@@ -179,6 +190,28 @@ def progress(request, task_id: str):
 
     return 200, document
 
+"""The file an operation wrote, downloaded by the id its own result linked to.
+
+Registered paths are relative to the repository root, since that is where every process writing one
+runs from, and are resolved against it here rather than against wherever this happens to be served.
+Nothing outside that root is served whatever a row says, so a path is never a way out of the project.
+"""
+@api.get(
+    ATTACHMENTS_PATH + '/{attachment_id}',
+    response = {200: None, 404: Refused},
+    summary = 'Download a generated ground truth or answers file',
+)
+def download(request, attachment_id: int):
+    attachment = buildAttachmentsRepository().load(attachment_id)
+    if attachment is None:
+        return 404, missing(attachment_id)
+
+    path = Path(settings.BASE_DIR, attachment.getPath()).resolve()
+    if not path.is_relative_to(settings.BASE_DIR) or not path.is_file():
+        return 404, missing(attachment_id)
+
+    return FileResponse(path.open('rb'), as_attachment = True, filename = path.name)
+
 """Starts an operation and answers with the task it is followed by.
 
 The lock is taken here and let go of by the thread, so an operation nobody may run twice at once
@@ -209,6 +242,18 @@ def released(work, lock):
 
     return released
 
+"""Shaped like the refusal of an operation, since a caller reading one already reads the other"""
+def missing(id):
+    return {'task_id': None, 'success': False, 'info': MISSING.format(id = id)}
+
+"""Where a generated file is downloaded from.
+
+Absolute for the caller an operation hands it to, which reaches this application from outside rather
+than from the address it is served on.
+"""
+def attachmentUrl(id, baseUrl = ''):
+    return '{base}{path}/{id}'.format(base = baseUrl.rstrip('/'), path = ATTACHMENTS_PATH, id = id)
+
 """Rebuilds the search index from every genre stored, and reports how many that turned out to be.
 
 What the RAG later retrieves from, so nothing else here is worth running until this has.
@@ -227,12 +272,20 @@ def ingesting(engine):
 
 Takes no engine: the questions come from the stored genres themselves, with no index searched, so
 one set of them is what two engines are compared over.
+
+The link is where the file just written is downloaded from, so a caller reads the questions it paid
+for without a shell on the server that holds them.
 """
 def generating():
     def work(progress):
         [attachment, questions] = buildGenresGroundTruth().generate(progress = progress)
 
-        return {'generated': questions, 'success': True, 'info': GROUND_TRUTH_SUCCESS}
+        return {
+            'generated': questions,
+            'success': True,
+            'info': GROUND_TRUTH_SUCCESS,
+            'link': attachmentUrl(attachment.getId(), settings.API_BASE_URL),
+        }
 
     return work
 
@@ -245,7 +298,12 @@ def answering(engine):
     def work(progress):
         [attachment, answers] = buildGroundTruthAnswers(engine).generate(progress)
 
-        return {'answered': answers, 'success': True, 'info': CREATE_ANSWERS_SUCCESS}
+        return {
+            'answered': answers,
+            'success': True,
+            'info': CREATE_ANSWERS_SUCCESS,
+            'link': attachmentUrl(attachment.getId(), settings.API_BASE_URL),
+        }
 
     return work
 
