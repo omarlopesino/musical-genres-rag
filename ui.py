@@ -14,8 +14,21 @@ import streamlit as st
 
 from musical_genres_rag.models import Feedback
 from musical_genres_rag.Rag import EmptyRagResponse, EmptyRetrievalError
-from musical_genres_rag.Report import EVALUATIONS_PATH, reportUrl
-from musical_genres_rag.services import buildEvaluationRunsRepository, buildFeedbackRepository, buildGenresRag
+from musical_genres_rag.Report import (
+    BATCH_PARAM,
+    CONVERSATION_PARAM,
+    EVALUATIONS_PATH,
+    JUDGEMENTS_PATH,
+    feedbackUrl,
+    reportUrl,
+)
+from musical_genres_rag.services import (
+    buildConversationsRepository,
+    buildEvaluationRunsRepository,
+    buildFeedbackRepository,
+    buildGenresRag,
+    buildJudgeBatchRepository,
+)
 
 # Streamlit renders every bare expression a script leaves at module level, a docstring above a
 # function included, so everything explanatory in this file is a comment instead.
@@ -26,9 +39,9 @@ from musical_genres_rag.services import buildEvaluationRunsRepository, buildFeed
 # what Postgres would have rejected on the way in
 QUESTION_LENGTH = 255
 
-# What survives a rerun. Every button press runs this script again from the top, so the answer on
-# screen and the conversation it belongs to are held here rather than rebuilt.
-ANSWER_STATE = 'answer'
+# What survives a rerun. Every button press runs this script again from the top, so the conversation
+# on screen is held here rather than rebuilt — and it is the answer too, since it carries the one it
+# was registered with.
 CONVERSATION_STATE = 'conversation'
 # The thumbs are their own widget per conversation, and this is what was last stored from them
 THUMBS_STATE = 'thumbs-{conversation}'
@@ -168,6 +181,50 @@ CASE_LABELS = {
     'LLMJudge reason': 'judgement',
 }
 
+CONVERSATION_LABELS = {
+    'id': 'id',
+    'question': 'query',
+    'answer': 'answer',
+    'created': 'date',
+    'feedback': 'feedback',
+}
+
+# The prose of a conversation, held narrow so the date and the link keep their place on the row
+NARROW_CONVERSATIONS = ['question', 'answer']
+
+JUDGEMENT_LABELS = {
+    'id': 'id',
+    'question': 'question',
+    'answer': 'answer',
+    'relevance': 'relevance',
+    'judgement': 'judgement',
+}
+
+# Held narrow: an answer and the judgement of it are both prose, and either would take the width
+# from the rest of the row on its own
+NARROW_JUDGEMENTS = ['answer', 'relevance', 'judgement']
+
+# What the judgements page is narrowed to comes off the url under the names Report.py writes its
+# links with, so the end that reads them and the end that builds them cannot drift apart.
+
+CONVERSATIONS_CAPTION = 'Every question put to the RAG and what came back, newest first.'
+JUDGEMENTS_CAPTION = 'What a judge made of the answers people left feedback on, newest first.'
+BATCH_CAPTION = 'What the judge run of {date} made of the answers it read, newest first.'
+CONVERSATION_CAPTION = 'What was made of the answer given on {date}.'
+
+EMPTY_JUDGEMENTS = 'No answer has been judged in these dates yet.'
+# Read where a conversation is what the page was narrowed to: its feedback exists, or the link
+# leading here would not have been offered, and nobody has judged it yet
+EMPTY_CONVERSATION = 'Nobody has judged the feedback left on this conversation yet.'
+
+# What the judgements are read under, each with what it means underneath it
+JUDGEMENT_SUMMARY = [
+    ('Positive', 'positive', 'Share of the thumbs pressed that were up'),
+    ('Average relevance', 'relevance', 'What a judge made of the answers, on average'),
+    ('Judgements', 'judgements', 'Answers a judge has read back'),
+    ('Feedbacks', 'feedbacks', 'Answers somebody left feedback on, judged or not'),
+]
+
 # Under this a slice is too thin to carry its own label without landing on its neighbour's
 MINIMUM_LABEL = 0.08
 
@@ -192,6 +249,8 @@ ROW_HEIGHT = 35
 
 repository = buildEvaluationRunsRepository()
 feedbackRepository = buildFeedbackRepository()
+conversationRepository = buildConversationsRepository()
+batchRepository = buildJudgeBatchRepository()
 
 
 # Held for the session rather than built beside the repositories above, because a Rag opens an
@@ -238,6 +297,11 @@ def donut(slices, scale):
 # A run that never scored one shows a dash rather than a bare "None"
 def formatScore(score):
     return '{score:.2f}'.format(score = score) if score is not None else '—'
+
+
+# The same, for the shares that are read as a percentage: nothing was pressed, so there is no share
+def formatShare(share):
+    return '{share:.0%}'.format(share = share) if share is not None else '—'
 
 
 # The mean the evaluation itself worked out, or nothing when the run never scored that evaluator.
@@ -380,6 +444,42 @@ def toCasesFrame(cases):
     return frame.map(lambda value: ', '.join(value) if isinstance(value, list) else value)
 
 
+# One row per conversation, carrying the link to whatever was made of it. A conversation nobody
+# rated carries nothing there: the column offers a button where there is something to open, and an
+# empty cell where the answer is simply one nobody had an opinion on.
+def toConversationsFrame(conversations):
+    rows = [
+        {
+            'id': conversation.getId(),
+            'question': conversation.getQuestion(),
+            'answer': conversation.getAnswer()['answer']['answer'],
+            'created': conversation.getCreated().strftime(FULL_DATE_FORMAT),
+            'feedback': feedbackUrl(conversation.getId()) if conversation.getFeedback() else None,
+        }
+        for conversation in conversations
+    ]
+
+    return pandas.DataFrame(rows).rename(columns = CONVERSATION_LABELS)
+
+
+# One row per judged answer. The answer is the prose the LLM wrote and not the whole response stored
+# beside it: the context it was written from is thousands of characters, kept for a judge to read and
+# not for a cell.
+def toJudgementsFrame(feedbacks):
+    rows = [
+        {
+            'id': feedback.getId(),
+            'question': feedback.getConversation().getQuestion(),
+            'answer': feedback.getConversation().getAnswer()['answer']['answer'],
+            'relevance': formatScore(feedback.getRelevance()),
+            'judgement': feedback.getJudgement(),
+        }
+        for feedback in feedbacks
+    ]
+
+    return pandas.DataFrame(rows).rename(columns = JUDGEMENT_LABELS)
+
+
 # One row per run, carrying the link its report is reached by. What a run scored belongs to the
 # report, so the list only says which run it is and how to open it.
 def toRunsFrame(runs):
@@ -397,11 +497,11 @@ def toRunsFrame(runs):
     return pandas.DataFrame(rows).rename(columns = RUN_LABELS)
 
 
-# The narrow columns, under whatever heading they are shown by
-def narrowColumns():
+# The narrow columns of a table, under whatever heading each is shown by
+def narrowColumns(columns, labels):
     return {
-        CASE_LABELS.get(column, column): st.column_config.TextColumn(width = 'small')
-            for column in NARROW_COLUMNS
+        labels.get(column, column): st.column_config.TextColumn(width = 'small')
+            for column in columns
     }
 
 
@@ -412,10 +512,7 @@ def renderTable(frame, **options):
 
 # The run named by the query string, or nothing when it names none that exists
 def loadRun(id):
-    if id is None or not id.isdigit():
-        return None
-
-    return repository.load(int(id))
+    return loadNamed(id, repository)
 
 
 def renderSummary(run):
@@ -473,40 +570,40 @@ def renderNamed(title, named, empty):
             st.write(item['description'])
 
 
-# What the person asking made of the answer, stored under the conversation it was given in so the
-# judge that will read the same answer back writes its verdict beside this one rather than over it.
-def renderFeedback(conversation, question, answer):
+# What the person asking made of the answer, stored against the conversation it was given in so the
+# judge that reads the same answer back writes its verdict beside this one rather than over it.
+def renderFeedback(conversation):
     # Keyed by the conversation, or the thumb pressed on one answer would arrive already pressed on
     # the next one and rate an answer nobody had read yet
-    thumb = st.feedback('thumbs', key = THUMBS_STATE.format(conversation = conversation))
+    thumb = st.feedback('thumbs', key = THUMBS_STATE.format(conversation = conversation.getId()))
     if thumb is None:
         return
 
     score = SCORES[thumb]
     # The widget hands its selection back on every rerun, and the rerun a thumb causes is only one
     # of them, so a verdict already stored is not written again on the next pass through the page.
-    if st.session_state.get(SCORED_STATE) != [conversation, score]:
-        feedbackRepository.save(conversation, Feedback.Source.USER, question, answer, score)
-        st.session_state[SCORED_STATE] = [conversation, score]
+    if st.session_state.get(SCORED_STATE) != [conversation.getId(), score]:
+        feedbackRepository.save(conversation, Feedback.Source.USER, score)
+        st.session_state[SCORED_STATE] = [conversation.getId(), score]
 
     st.caption(FEEDBACK_THANKS)
 
 
-# The answer as it was stored: what the LLM wrote, the genres and instruments it named, and the
+# The answer as it was registered: what the LLM wrote, the genres and instruments it named, and the
 # thumbs. Nothing at all before the first question of the session has been asked.
 def renderAnswer():
-    stored = st.session_state.get(ANSWER_STATE)
-    if stored is None:
+    conversation = st.session_state.get(CONVERSATION_STATE)
+    if conversation is None:
         return
 
-    answer = stored['answer']
+    answer = conversation.getAnswer()['answer']
     st.divider()
     st.markdown(answer['answer'])
 
     for field, title in ANSWERED.items():
         renderNamed(title, answer[field], EMPTY_NAMED.format(named = field))
 
-    renderFeedback(st.session_state[CONVERSATION_STATE], stored['query'], stored)
+    renderFeedback(conversation)
 
 
 def chat():
@@ -527,18 +624,115 @@ def chat():
     if sent and question.strip():
         # The answer on screen goes before the next one is asked for, so a query that takes its time
         # is never spent under the answer to a question nobody is asking any more
-        st.session_state.pop(ANSWER_STATE, None)
+        st.session_state.pop(CONVERSATION_STATE, None)
 
         with st.spinner(SEARCHING):
             response = askRag(question)
 
-        # Stored as the dict rather than the response, which is what the feedback row carries and
-        # what the page reads back on every rerun from here on
-        st.session_state[ANSWER_STATE] = response.toDict()
-        # Minted with the answer, not with the thumb, so both verdicts on it share a conversation
-        st.session_state[CONVERSATION_STATE] = feedbackRepository.nextConversation()
+        # Registered with the answer and not with the thumb, so every answer given is stored whether
+        # anybody goes on to rate it or not. It is what the page reads back on every rerun from here
+        # on, and what any verdict on this answer is stored against.
+        st.session_state[CONVERSATION_STATE] = conversationRepository.create(question, response.toDict())
 
     renderAnswer()
+
+
+# The judgements read at a glance, over the same days the table below shows. The thumbs are stored
+# as 1 and 0, so the share of them that were up is the mean of them; the two totals differ because a
+# feedback nobody has judged yet is still a feedback.
+def renderJudgementSummary(summary):
+    st.markdown(SUMMARY_STYLE, unsafe_allow_html = True)
+
+    shown = {'positive': formatShare, 'relevance': formatScore}
+    for column, [label, name, tooltip] in zip(st.columns(len(JUDGEMENT_SUMMARY)), JUDGEMENT_SUMMARY):
+        value = shown[name](summary[name]) if name in shown else summary[name]
+        column.metric(label, value, help = tooltip)
+
+
+# The row a query string names, or nothing when it names none that exists. A judge run links to the
+# answers it read this way, and a conversation to the feedback left on it.
+def loadNamed(id, repository):
+    if id is None or not id.isdigit():
+        return None
+
+    return repository.load(int(id))
+
+
+def conversations():
+    st.title('Conversations')
+    st.caption(CONVERSATIONS_CAPTION)
+
+    stored = conversationRepository.findLatest()
+    if not stored:
+        st.info('Nothing has been asked yet. Ask something on the chat page.')
+        return
+
+    renderTable(
+        toConversationsFrame(stored),
+        column_config = {
+            **narrowColumns(NARROW_CONVERSATIONS, CONVERSATION_LABELS),
+            CONVERSATION_LABELS['feedback']: st.column_config.LinkColumn(display_text = 'Open'),
+        },
+    )
+
+
+# What the page is narrowed to, and what it says of itself while it is. A judge run and a
+# conversation each name themselves in the url; neither, and the page is all of the judgements.
+def judgementsHeading(batch, conversation):
+    if batch is not None:
+        return [
+            'Judge run {batch}'.format(batch = batch.getId()),
+            BATCH_CAPTION.format(date = batch.getCreated().strftime(FULL_DATE_FORMAT)),
+        ]
+
+    if conversation is not None:
+        return [
+            'Conversation {conversation}'.format(conversation = conversation.getId()),
+            CONVERSATION_CAPTION.format(date = conversation.getCreated().strftime(FULL_DATE_FORMAT)),
+        ]
+
+    return ['Judgements', JUDGEMENTS_CAPTION]
+
+
+def judgements():
+    askedBatch = st.query_params.get(BATCH_PARAM)
+    askedConversation = st.query_params.get(CONVERSATION_PARAM)
+    batch = loadNamed(askedBatch, batchRepository)
+    conversation = loadNamed(askedConversation, conversationRepository)
+
+    named = [(askedBatch, batch, 'judge run'), (askedConversation, conversation, 'conversation')]
+    for asked, found, what in named:
+        if asked is not None and found is None:
+            st.title('Judgements')
+            st.warning('That {what} does not exist. Read all of the judgements instead.'.format(what = what))
+            st.link_button('Back to all the judgements', JUDGEMENTS_PATH)
+            return
+
+    [title, caption] = judgementsHeading(batch, conversation)
+    st.title(title)
+    st.caption(caption)
+
+    # The dates narrow a run the same way they narrow everything, so a run is still read by day
+    [dateColumn, *_] = st.columns(3)
+    dates = dateColumn.date_input('Judged between', value = ())
+
+    # The picker hands back nothing, one date or both, depending on how far through it the user is
+    [since, until] = [*dates, None, None][:2]
+
+    if batch is not None or conversation is not None:
+        st.link_button('Back to all the judgements', JUDGEMENTS_PATH)
+
+    renderJudgementSummary(feedbackRepository.getJudgementSummary(since, until, batch, conversation))
+
+    feedbacks = feedbackRepository.findJudged(since, until, batch, conversation)
+    if not feedbacks:
+        st.info(EMPTY_CONVERSATION if conversation is not None else EMPTY_JUDGEMENTS)
+        return
+
+    renderTable(
+        toJudgementsFrame(feedbacks),
+        column_config = narrowColumns(NARROW_JUDGEMENTS, JUDGEMENT_LABELS),
+    )
 
 
 def selection():
@@ -581,13 +775,15 @@ def report():
     renderFound(run)
 
     section(REPORT_SECTION)
-    renderTable(toCasesFrame(run.report['cases']), column_config = narrowColumns())
+    renderTable(toCasesFrame(run.report['cases']), column_config = narrowColumns(NARROW_COLUMNS, CASE_LABELS))
 
 
 # The default page always sits at "/", whatever url_path says, so the chat is the page the app opens
 # on and the evaluations are reached by the path EVALUATIONS_PATH names.
 st.navigation([
     st.Page(chat, title = 'Chat', default = True),
+    st.Page(conversations, title = 'Conversations', url_path = 'conversations'),
+    st.Page(judgements, title = 'Judgements', url_path = 'judgements'),
     st.Page(selection, title = 'Evaluations', url_path = 'evaluations'),
     st.Page(report, title = 'Report', url_path = 'report'),
 ]).run()
