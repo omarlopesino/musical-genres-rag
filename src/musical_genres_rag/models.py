@@ -162,40 +162,45 @@ class EvaluationRun(models.Model):
     def getAverages(self):
         return self.averages
 
-"""What was made of one answer, by the person who asked it or by a judge reading it back.
+"""One run of the judge, so the answers it read are read back together.
 
-Both verdicts on the same answer are the same conversation, so they share an id and are
-told apart by their source.
+A batch is what the run it belongs to is linked as, exactly as an evaluation run is linked as its
+own report: nothing is stored on it that the rows naming it do not already say.
 """
-class Feedback(models.Model):
+class JudgeBatch(models.Model):
 
-    class Source(models.TextChoices):
-        USER = 'user'
-        LLM = 'llm'
-
-    pk = models.CompositePrimaryKey('id', 'source')
-    # Drawn from feedback_id_seq, which the migration creates: a composite key cannot carry
-    # an AutoField, and both rows of a conversation have to be inserted under the same id
-    id = models.BigIntegerField()
-    source = models.CharField(max_length = 16, choices = Source.choices)
-    question = models.CharField(max_length = 255)
-    # The whole RagResponse.toDict(), the rendered context included, so a judge scores the
-    # answer against what the LLM was actually given
-    answer = models.JSONField()
-    # What the thumbs said, as 1 or 0
-    score = models.FloatField(null = True)
-    # Filled by nobody yet: the judge that will write these is not built
-    judgement = models.TextField(null = True)
-    relevance = models.FloatField(null = True)
+    id = models.BigAutoField(primary_key = True)
+    created = models.DateTimeField(auto_now_add = True)
 
     class Meta:
-        db_table = 'feedback'
+        db_table = 'judge_batch'
 
     def getId(self):
         return self.id
 
-    def getSource(self):
-        return self.source
+    def getCreated(self):
+        return self.created
+
+    def __str__(self):
+        return str(self.id)
+
+"""A question put to the RAG and what came back, recorded whether anybody rated it or not.
+
+The answer is the whole RagResponse.toDict(), the rendered context included, so a judge scores
+it against what the LLM was actually given rather than against the index as it stands today.
+"""
+class Conversation(models.Model):
+
+    id = models.BigAutoField(primary_key = True)
+    question = models.CharField(max_length = 255)
+    answer = models.JSONField()
+    created = models.DateTimeField(auto_now_add = True)
+
+    class Meta:
+        db_table = 'conversation'
+
+    def getId(self):
+        return self.id
 
     def getQuestion(self):
         return self.question
@@ -203,8 +208,73 @@ class Feedback(models.Model):
     def getAnswer(self):
         return self.answer
 
+    def getCreated(self):
+        return self.created
+
+    """What was made of this answer, or nothing where nobody has made anything of it yet.
+
+    At most one per source, and only a user's is ever written today. Read off the set as it was
+    prefetched rather than asked for again, so a page listing conversations stays one query.
+    """
+    def getFeedback(self):
+        return next(iter(self.feedback.all()), None)
+
+    def __str__(self):
+        return self.question
+
+"""What was made of one answer, by the person who asked it or by a judge reading it back.
+
+Both verdicts on the same answer are the same conversation, so they point at the one it was
+given in and are told apart by their source.
+"""
+class Feedback(models.Model):
+
+    class Source(models.TextChoices):
+        USER = 'user'
+        LLM = 'llm'
+
+    id = models.BigAutoField(primary_key = True)
+    conversation = models.ForeignKey(Conversation, on_delete = models.PROTECT, related_name = 'feedback')
+    source = models.CharField(max_length = 16, choices = Source.choices)
+    # What the thumbs said, as 1 or 0
+    score = models.FloatField(null = True)
+    # What a judge made of the answer, reading it back against the context it was written from
+    judgement = models.TextField(null = True)
+    relevance = models.FloatField(null = True)
+    # Which run judged it, so a run links to the answers it read. Null until one has: a foreign key
+    # may not point at a composite key, but a composite key may hold one, and this is that direction.
+    judge_batch = models.ForeignKey(JudgeBatch, on_delete = models.PROTECT, related_name = 'judgements', null = True)
+    created = models.DateTimeField(auto_now_add = True)
+
+    class Meta:
+        db_table = 'feedback'
+        # One verdict per source per conversation: pressing the other thumb corrects the one stored
+        constraints = [models.UniqueConstraint(fields = ['conversation', 'source'], name = 'feedback_conversation_source')]
+        indexes = [models.Index(fields = ['-created', '-id'], name = 'feedback_created')]
+
+    def getId(self):
+        return self.id
+
+    def getConversation(self):
+        return self.conversation
+
+    def getSource(self):
+        return self.source
+
     def getScore(self):
         return self.score
+
+    def getJudgement(self):
+        return self.judgement
+
+    def getRelevance(self):
+        return self.relevance
+
+    def getJudgeBatch(self):
+        return self.judge_batch
+
+    def getCreated(self):
+        return self.created
 
     def __str__(self):
         return self.question
