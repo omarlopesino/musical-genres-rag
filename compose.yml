@@ -82,7 +82,40 @@ services:
       redis:
         condition: service_started
 
+  # The orchestrator, as a single container: `airflow standalone` runs the api server, the scheduler,
+  # the dag processor and the triggerer in one process group, over a SQLite metadata database kept in
+  # the volume below. That is the development layout Airflow documents, and it is enough for dags that
+  # do their work by calling the app over HTTP rather than in a worker of their own.
+  airflow:
+    container_name: ${PROJECT_NAME}_airflow
+    image: apache/airflow:3.3.0
+    command: standalone
+    environment:
+      # No login: the simple auth manager waves everyone through as admin. It is what keeps this from
+      # needing the password it would otherwise generate into the volume and expect to be read back.
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      # Only the dags in ./dags, so the tutorial's is the one thing listed
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      # The connection the dags reach the app by, defined here rather than as a row in the metadata
+      # database so it exists on a fresh volume without anyone adding it through the UI. The host is
+      # the service name: from inside this network the app does not answer on localhost.
+      AIRFLOW_CONN_MUSICAL_GENRES_RAG: "http://app:8000"
+    volumes:
+      # Metadata database, logs and airflow.cfg, kept across restarts of the container
+      - mgr_airflow_home:/opt/airflow
+      - ./dags:/opt/airflow/dags:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      # First boot migrates the metadata database before anything answers
+      start_period: 90s
+
 volumes:
   mgr_pgdata:
   mgr_ui_venv:
   mgr_app_venv:
+  mgr_airflow_home:
