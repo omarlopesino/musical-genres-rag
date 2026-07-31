@@ -2,7 +2,7 @@ empty :=
 space := $(empty) $(empty)
 .RECIPEPREFIX := $(space)
 
-.PHONY: setup build start stop drop psql migrate seed directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers
+.PHONY: setup build start stop drop psql migrate seed config directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers
 
 DB_NAME = musical_genres
 MANAGE = uv run python manage.py
@@ -16,12 +16,19 @@ ENGINE_ARG = $(if $(ENGINE),--engine $(ENGINE))
 
 setup:
     uv sync
+    $(MAKE) config
     $(MAKE) directories
     $(MAKE) downloadModel
     docker compose down -v
     docker compose up -d --wait
     $(MAKE) migrate
     $(MAKE) seed
+
+# The prompts, the models and the engine, which are edited rather than committed. Before
+# downloadModel on purpose: which weights that fetches is read from here. Never overwrites a
+# config.yml already there, since what it holds is somebody's tuning.
+config:
+    cp -n config.yml.dist config.yml
 
 # tests/ holds generated files only and is gitignored, so a fresh clone starts without the
 # directory the ground truth is written into.

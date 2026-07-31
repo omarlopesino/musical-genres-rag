@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from musical_genres_rag.Config import Config
 from musical_genres_rag.models import Attachment, EvaluationRun
 from musical_genres_rag.Progress import NULL_PROGRESS
 from musical_genres_rag.Rag import cost, EmptyRagResponse, EmptyRetrievalError, UNKNOWN_ANSWER
@@ -25,7 +26,7 @@ ID_COLUMN = 'id'
 # Everything else describes the subject, and is what a case is named after
 RESERVED_COLUMNS = (ID_COLUMN, QUESTION_COLUMN)
 
-MODEL = 'gpt-5.4-mini'
+MODEL = Config.getShared().getChatModel()
 
 # How many cases are scored at once. An evaluator that calls an LLM is bound by what the provider
 # accepts per minute, not by how fast the cases can be read.
@@ -71,24 +72,9 @@ def requireLatestGroundTruthAnswer(attachmentsRepository, index):
         ))
     return latestResponse
 
-INSTRUCTIONS = '''
-You are some musician looking up to learn about genres. 
+INSTRUCTIONS = Config.getShared().getPrompt('ground_truth.instructions')
 
-You will receive a full genre as the context.
-
-You don't know this genre's name — you are trying to find it. Type into a
-search engine the 5 things you would actually search to track it down,
-based on what the context tells you about it.
-
-Rules:
-- Genre name must not be contained in the question.
-- Ask what the genre context actually answers.
-'''.strip()
-
-PROMPT = '''
-GENRE:
-{genre}
-'''.strip()
+PROMPT = Config.getShared().getPrompt('ground_truth.prompt')
 
 class GenreQuestion(BaseModel):
     id: str = Field(description = "Exact genre ID from context")
@@ -492,38 +478,13 @@ class GenreRagGenreMrr(Evaluator):
         return 1 / (genres.index(genre) + 1)
 
 """Read by the LLMJudge evaluator pydantic-evals ships, which hands the judge the whole recorded
-output as JSON and this rubric as the only instruction, so the rubric names the fields to read.
+output as JSON and this rubric as its only instruction.
 
 Judged against the stored prompt rather than the index: what makes an answer correct is the
-context it was actually written from, not the context the same query would retrieve today.
+context it was actually written from, not the context the same query would retrieve today, which
+is why the rubric in config.yml is written to read the recorded "prompt" field and nothing else.
 """
-JUDGE_RUBRIC = '''
-The output is a JSON object recording one answer of a musical genre RAG system. Its "prompt"
-field holds the question that was asked and the whole context the system was allowed to use.
-Its "answer" field holds the response it produced. Ignore every other field.
-
-The response is correct when both of these hold:
-- It finds genres for the user.
-- The answer is related directly with the question asked in the prompt.
-
-Judge the response only against the context in the prompt. What you know about music is not
-evidence: an answer that is true in the world but unsupported by the context is incorrect, and
-a genre named in the response but absent from the context is incorrect however plausible.
-
-The context is a list of entries, each naming one genre. Only those entries are available to
-answer with. A genre that appears merely as a word inside another entry's description is not
-one of them, so do not treat it as something the response could have named. Before calling a
-response incorrect for declining, name in the "reason" field the entry you say answers the
-question, and quote the words from it you relied on. If you cannot quote them, the context does
-not answer and declining was correct.
-
-"I don't know." is correct only when the context genuinely holds no answer to the question.
-When the context does answer it, declining is incorrect. When "prompt" is null nothing was
-retrieved at all, so the user was found no genres and the response is incorrect.
-
-The question is vague on purpose and never names the genre it describes. Vague is not
-incorrect: judge whether the response found what the question described.
-'''.strip()
+JUDGE_RUBRIC = Config.getShared().getPrompt('evaluation.judge.rubric')
 
 """The judge runs through pydantic-ai, which names a model by its provider rather than alone"""
 JUDGE_MODEL = 'openai:{model}'.format(model = MODEL)

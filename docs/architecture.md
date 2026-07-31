@@ -193,3 +193,48 @@ One engine, three modes, named after what each of them writes and searches:
 `1 / (60 + rank)` per ranking: a bm25 score and a cosine distance are not the same kind of number
 and are never added, so only the rank each half gave is read. `Vectorizer` keeps one ONNX session
 per process — an embedder is built per entity indexed, and the weights are read off disk once.
+
+Which of the three a run searches through is `index_engine` in `config.yml`, read into
+`services.INDEX_ENGINE`. `ENGINES` stays in `services.py`: a way of searching is a class that has to
+exist, not a line of configuration, and the command line, the API and the dags all offer whatever it
+lists.
+
+## Configuration
+
+`Config` reads `config.yml` once per process and hands back what it says. Everything that decides
+how this behaves rather than what it can do is in there: every prompt, the chat model, the embedding
+model and the engine above.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Config {
+        +getShared()$
+        +getIndexEngine()
+        +getChatModel()
+        +getEmbeddingModel()
+        +getPrompt(path)
+    }
+
+    class ConfigFile["config.yml"] {
+        +index_engine
+        +models
+        +prompts
+    }
+
+    Config --> ConfigFile : parses once, through settings.CONFIG_FILE
+    Rag ..> Config : instructions, prompt, model
+    GroundTruth ..> Config : instructions, prompt, model
+    EvaluationRunner ..> Config : judge rubric, judge model
+    FeedbackRelevanceJudge ..> Config : instructions, prompt
+    Vectorizer ..> Config : which weights to read
+    Services["services.py"] ..> Config : which engine, unless a run says otherwise
+```
+
+Nothing defaults a value the file also carries, so the two can never drift apart: a key left out is
+an error naming itself rather than a silent fall back to something nobody wrote down. The file is
+copied from the committed `config.yml.dist` by `make config` and is not itself committed, so a
+prompt somebody is tuning is theirs. What stays in the code is what the file cannot decide —
+`VECTOR_DIMENSIONS`, which `models.py` declares a column with, and the token prices, which are what
+a provider charges rather than what this application chose.

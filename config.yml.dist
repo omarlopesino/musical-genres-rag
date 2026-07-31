@@ -1,0 +1,117 @@
+# Everything that decides how this RAG behaves, so tuning it is editing this rather than editing
+# Python. Copied to config.yml by "make config", which never overwrites one already there: the copy
+# is yours to edit and is not committed.
+#
+# No secret belongs here. The one this project has, OPENAI_API_KEY, stays in .env.
+
+# Which search engine everything runs through: one of the names services.ENGINES lists, so
+# postgres_text, postgres_embed or postgres_hybrid. "--engine" on a command and "engine" in an API
+# request still override it for a single run.
+index_engine: postgres_text
+
+models:
+  # Writes every answer, generates the ground truth and judges both. The prices a cost is worked out
+  # from live in Rag.py and are not read from here, so changing this leaves them behind.
+  chat: gpt-5.4-mini
+
+  # The embedding model, as it is named on the hub. "make downloadModel" fetches this one, the vector
+  # engines read it, and an evaluation records it under this name. A model returning a vector of a
+  # different width also needs the index column redeclared, which is a migration.
+  embedding: Xenova/all-MiniLM-L6-v2
+
+# What is said to the model, and how what it is asked about is laid out for it.
+#
+# The braces below are what format() fills in, so every prompt must keep the ones it is given and no
+# others: a brace meaning itself breaks the call that fills the prompt in.
+prompts:
+
+  # The chat: what answers a question out of what the index retrieved.
+  rag:
+    # Must keep telling the model to answer exactly "I don't know.". That phrase is matched in code
+    # as Rag.UNKNOWN_ANSWER, and the judge rubric below is written around it.
+    instructions: |
+      You are a music genre specialist. Your goal is to teach the user about the genres
+      related to their request.
+
+      Use the context to find relevant information and provide accurate answers. Don't use outside knowledge. If the
+      question's answer is not in the context, answer must be "I don't know.". Relate the
+      user's question to the content, even when the question is vague.
+
+      The structured output must be done in a register halfway between technical and colloquial.
+    prompt: |
+      QUESTION: {question}
+
+      CONTEXT:
+      {context}
+
+  # The questions an evaluation is scored against, written from each genre by the same model
+  ground_truth:
+    instructions: |
+      You are some musician looking up to learn about genres.
+
+      You will receive a full genre as the context.
+
+      You don't know this genre's name — you are trying to find it. Type into a
+      search engine the 5 things you would actually search to track it down,
+      based on what the context tells you about it.
+
+      Rules:
+      - Genre name must not be contained in the question.
+      - Ask what the genre context actually answers.
+    prompt: |
+      GENRE:
+      {genre}
+
+  evaluation:
+    # Read by the LLMJudge evaluator pydantic-evals ships, which hands the judge the whole recorded
+    # output as JSON and this rubric as its only instruction, which is why the rubric names the
+    # fields to read rather than being told about them.
+    judge:
+      rubric: |
+        The output is a JSON object recording one answer of a musical genre RAG system. Its "prompt"
+        field holds the question that was asked and the whole context the system was allowed to use.
+        Its "answer" field holds the response it produced. Ignore every other field.
+
+        The response is correct when both of these hold:
+        - It finds genres for the user.
+        - The answer is related directly with the question asked in the prompt.
+
+        Judge the response only against the context in the prompt. What you know about music is not
+        evidence: an answer that is true in the world but unsupported by the context is incorrect, and
+        a genre named in the response but absent from the context is incorrect however plausible.
+
+        The context is a list of entries, each naming one genre. Only those entries are available to
+        answer with. A genre that appears merely as a word inside another entry's description is not
+        one of them, so do not treat it as something the response could have named. Before calling a
+        response incorrect for declining, name in the "reason" field the entry you say answers the
+        question, and quote the words from it you relied on. If you cannot quote them, the context does
+        not answer and declining was correct.
+
+        "I don't know." is correct only when the context genuinely holds no answer to the question.
+        When the context does answer it, declining is incorrect. When "prompt" is null nothing was
+        retrieved at all, so the user was found no genres and the response is incorrect.
+
+        The question is vague on purpose and never names the genre it describes. Vague is not
+        incorrect: judge whether the response found what the question described.
+
+  # The judge that reads back an answer somebody already pressed a thumb on. The thumb is
+  # deliberately kept out of it: two verdicts are only worth comparing while neither was told what
+  # the other said.
+  feedback:
+    instructions: |
+      You are judging how well an answer served the question it was given for.
+
+      You will be shown the question, the context the answer was written from, and the answer itself.
+
+      Judge only what is in front of you. An answer is relevant when it answers the question out of that
+      context; it is not when it answers something else, contradicts the context, or brings in knowledge
+      the context does not hold. "I don't know." is the right answer to a question the context does not
+      answer, and is judged as such rather than as a failure.
+    prompt: |
+      QUESTION: {question}
+
+      THE PROMPT IT WAS ANSWERED FROM:
+      {context}
+
+      WHAT WAS ANSWERED:
+      {answer}

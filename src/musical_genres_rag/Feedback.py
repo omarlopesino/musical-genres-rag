@@ -1,3 +1,4 @@
+from musical_genres_rag.Config import Config
 from musical_genres_rag.Progress import NULL_PROGRESS
 from musical_genres_rag.Rag import cost, MODEL
 from pydantic import BaseModel, Field
@@ -11,30 +12,14 @@ This reads the same answer back against the very context it was written from —
 carries it — and writes down how well it answered and what was wrong with it where something was.
 
 Both verdicts end up on one row, so the thumb and the judgement are read side by side. The thumb is
-deliberately kept out of the prompt below: two verdicts are only worth comparing while neither of
-them was told what the other said.
+deliberately kept out of what is sent: two verdicts are only worth comparing while neither of them
+was told what the other said, which is why the prompt in config.yml is given the question, the
+context and the answer, and nothing about how it was received.
 """
 
-INSTRUCTIONS = '''
-You are judging how well an answer served the question it was given for.
+INSTRUCTIONS = Config.getShared().getPrompt('feedback.instructions')
 
-You will be shown the question, the context the answer was written from, and the answer itself.
-
-Judge only what is in front of you. An answer is relevant when it answers the question out of that
-context; it is not when it answers something else, contradicts the context, or brings in knowledge
-the context does not hold. "I don't know." is the right answer to a question the context does not
-answer, and is judged as such rather than as a failure.
-'''.strip()
-
-PROMPT = '''
-QUESTION: {question}
-
-THE PROMPT IT WAS ANSWERED FROM:
-{context}
-
-WHAT WAS ANSWERED:
-{answer}
-'''.strip()
+PROMPT = Config.getShared().getPrompt('feedback.prompt')
 
 # Read by nothing that was retrieved, which is an answer of its own and not a hole in the prompt
 NO_CONTEXT = 'Nothing was retrieved, so the answer was written from no context at all.'

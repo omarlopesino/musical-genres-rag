@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from musical_genres_rag.services import DEFAULT_ENGINE, ENGINES
+from musical_genres_rag.services import ENGINES, INDEX_ENGINE
 
 """A command that acts through a search engine, and so has to be told which one.
 
@@ -14,6 +14,6 @@ class EngineCommand(BaseCommand):
         parser.add_argument(
             '--engine',
             choices = list(ENGINES),
-            default = DEFAULT_ENGINE,
-            help = 'Which search engine to run through. Defaults to "{default}".'.format(default = DEFAULT_ENGINE),
+            default = INDEX_ENGINE,
+            help = 'Which search engine to run through. Left out, config.yml says "{engine}".'.format(engine = INDEX_ENGINE),
         )

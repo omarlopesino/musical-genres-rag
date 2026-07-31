@@ -33,6 +33,10 @@ API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
 # rather than committed, and relative to the repository, which is what the containers mount.
 MODELS_DIRECTORY = Path(os.getenv('MODELS_DIRECTORY', BASE_DIR / 'models'))
 
+# The prompts, the models and the engine. Copied from config.yml.dist by "make config" rather than
+# committed, since what it holds is edited, and relative to the repository like the weights above.
+CONFIG_FILE = Path(os.getenv('CONFIG_FILE', BASE_DIR / 'config.yml'))
+
 # The web layer is a JSON API and nothing else: no admin, auth, sessions or contenttypes, since
 # ninja serves it without templates, cookies or a CSRF token to carry.
 INSTALLED_APPS = [

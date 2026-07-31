@@ -1,4 +1,5 @@
 from django.conf import settings
+from musical_genres_rag.Config import Config
 from pathlib import Path
 
 import os
@@ -6,9 +7,11 @@ import shutil
 import threading
 
 # The model, as it is named on the hub, which is also what an evaluation records as its embedding model
-MODEL_REPOSITORY = 'Xenova/all-MiniLM-L6-v2'
+MODEL_REPOSITORY = Config.getShared().getEmbeddingModel()
 
-# How wide a vector it returns, which is what the column it is written to was declared as
+# How wide a vector it returns, which is what the column it is written to was declared as. Said here
+# rather than in config.yml beside the model: models.py reads it to declare that column, so it is
+# already written into a migration, and naming a model of another width means migrating to it.
 VECTOR_DIMENSIONS = 384
 
 MODEL_FILE = 'model.onnx'

@@ -23,6 +23,8 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "pydantic>=2.13.4",
     "pydantic-evals>=2.18.0",
+    # Arrives with pydantic-evals anyway, declared because config.yml is read directly with it
+    "pyyaml>=6.0.3",
     "redis>=8.0.1",
     "streamlit>=1.60.0",
     # Arrives with pydantic-ai anyway, declared because the retry policy imports it directly

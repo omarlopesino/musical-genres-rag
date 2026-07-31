@@ -1,3 +1,4 @@
+from musical_genres_rag.Config import Config
 from musical_genres_rag.Evaluation import GenreQuestionsGroundTruth, GenresRagEvaluationRunner, GenresRetrievalEvaluationRunner, GroundTruthAnswers
 from musical_genres_rag.Feedback import FeedbackRelevanceJudge
 from musical_genres_rag.Index import Index, PostgresSearchEngine
@@ -21,8 +22,13 @@ ENGINES = {
     'postgres_hybrid': lambda: PostgresSearchEngine(GENRE_INDEX_TABLE, 'hybrid'),
 }
 
-# The one that reads no weights, so a chat that only ever answers questions loads no model to do it
-DEFAULT_ENGINE = 'postgres_text'
+"""The one everything runs through when a run does not name another.
+
+Configured rather than chosen here, since which way of searching this application is being run with
+is a decision about a deployment and not about the code. "--engine" on a command and "engine" in an
+API request still say otherwise for a single run.
+"""
+INDEX_ENGINE = Config.getShared().getIndexEngine()
 
 """Builds the object graph on demand.
 
@@ -36,11 +42,11 @@ def buildGenresRepository():
 def buildAttachmentsRepository():
     return AttachmentsRepository()
 
-def buildGenresIndex(engine = DEFAULT_ENGINE, repository = None):
+def buildGenresIndex(engine = INDEX_ENGINE, repository = None):
     repository = repository if repository is not None else buildGenresRepository()
     return Index(ENGINES[engine](), repository)
 
-def buildGenresRag(engine = DEFAULT_ENGINE):
+def buildGenresRag(engine = INDEX_ENGINE):
     repository = buildGenresRepository()
     return GenresRag(repository, buildGenresIndex(engine, repository))
 
@@ -62,21 +68,21 @@ def buildJudgeBatchRepository():
 def buildFeedbackRelevanceJudge():
     return FeedbackRelevanceJudge(buildFeedbackRepository(), buildJudgeBatchRepository())
 
-def buildGenresRagEvaluationRunner(engine = DEFAULT_ENGINE):
+def buildGenresRagEvaluationRunner(engine = INDEX_ENGINE):
     return GenresRagEvaluationRunner(
         buildGenresIndex(engine),
         buildAttachmentsRepository(),
         buildEvaluationRunsRepository(),
     )
 
-def buildGenresRetrievalEvaluationRunner(engine = DEFAULT_ENGINE):
+def buildGenresRetrievalEvaluationRunner(engine = INDEX_ENGINE):
     return GenresRetrievalEvaluationRunner(
         buildGenresIndex(engine),
         buildAttachmentsRepository(),
         buildEvaluationRunsRepository(),
     )
 
-def buildGroundTruthAnswers(engine = DEFAULT_ENGINE):
+def buildGroundTruthAnswers(engine = INDEX_ENGINE):
     return GroundTruthAnswers(buildGenresRag(engine), buildAttachmentsRepository())
 
 def buildVectorizerDownload():

@@ -12,8 +12,8 @@ from musical_genres_rag.Feedback import DEFAULT_LIMIT
 from musical_genres_rag.Progress import CacheProgress, readProgress
 from musical_genres_rag.Report import batchFeedbackUrl, reportUrl
 from musical_genres_rag.services import (
-    DEFAULT_ENGINE,
     ENGINES,
+    INDEX_ENGINE,
     buildAttachmentsRepository,
     buildFeedbackRelevanceJudge,
     buildGenresGroundTruth,
@@ -128,7 +128,7 @@ class TaskRequest(Schema):
     task_id: Optional[str] = Field(default = None, pattern = TASK_ID_PATTERN)
 
 class EngineRequest(TaskRequest):
-    engine: Engine = Engine(DEFAULT_ENGINE)
+    engine: Engine = Engine(INDEX_ENGINE)
 
 """How many answers one run may read. Every one of them is a paid call, so a caller that runs this
 on a schedule bounds what a run costs rather than letting it read whatever has piled up."""

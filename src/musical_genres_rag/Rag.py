@@ -1,3 +1,4 @@
+from musical_genres_rag.Config import Config
 from musical_genres_rag.Renderer import EntityRenderer
 from typing import List
 from pydantic import BaseModel, Field
@@ -5,28 +6,18 @@ from openai import OpenAI
 from time import perf_counter
 import json
 
-INSTRUCTIONS = '''
-You are a music genre specialist. Your goal is to teach the user about the genres
-related to their request.
+INSTRUCTIONS = Config.getShared().getPrompt('rag.instructions')
 
-Use the context to find relevant information and provide accurate answers. Don't use outside knowledge. If the
-question's answer is not in the context, answer must be "I don't know.". Relate the
-user's question to the content, even when the question is vague.
+PROMPT = Config.getShared().getPrompt('rag.prompt')
 
-The structured output must be done in a register halfway between technical and colloquial.
-'''
-
-PROMPT = '''
-QUESTION: {question}
-
-CONTEXT:
-{context}
-'''.strip()
-
-MODEL = 'gpt-5.4-mini'
+MODEL = Config.getShared().getChatModel()
 
 # What the model charges, in dollars per million tokens. Writing costs six times reading, which is
 # why a cost is worked out from the two counts and never from their sum.
+#
+# Not configured beside the model above: these are what a provider charges rather than what this
+# application chose, so naming another model in config.yml leaves them behind and they have to be
+# put right here.
 INPUT_PRICE_PER_MILLION = 0.75
 OUTPUT_PRICE_PER_MILLION = 4.50
 
