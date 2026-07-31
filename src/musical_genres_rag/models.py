@@ -213,7 +213,7 @@ class Conversation(models.Model):
 
     """What was made of this answer, or nothing where nobody has made anything of it yet.
 
-    At most one per source, and only a user's is ever written today. Read off the set as it was
+    At most one, whether a judge has read it back yet or not. Read off the set as it was
     prefetched rather than asked for again, so a page listing conversations stays one query.
     """
     def getFeedback(self):
@@ -222,20 +222,17 @@ class Conversation(models.Model):
     def __str__(self):
         return self.question
 
-"""What was made of one answer, by the person who asked it or by a judge reading it back.
+"""What was made of one answer: what the person who asked pressed, and what a judge made of the
+same answer reading it back.
 
-Both verdicts on the same answer are the same conversation, so they point at the one it was
-given in and are told apart by their source.
+Both verdicts share the row, because both are about the one answer. A row starts when somebody
+presses a thumb and is judged afterwards, so the judged half is empty for as long as it takes a
+run to get to it, and that emptiness is what a run looks for.
 """
 class Feedback(models.Model):
 
-    class Source(models.TextChoices):
-        USER = 'user'
-        LLM = 'llm'
-
     id = models.BigAutoField(primary_key = True)
     conversation = models.ForeignKey(Conversation, on_delete = models.PROTECT, related_name = 'feedback')
-    source = models.CharField(max_length = 16, choices = Source.choices)
     # What the thumbs said, as 1 or 0
     score = models.FloatField(null = True)
     # What a judge made of the answer, reading it back against the context it was written from
@@ -253,8 +250,9 @@ class Feedback(models.Model):
 
     class Meta:
         db_table = 'feedback'
-        # One verdict per source per conversation: pressing the other thumb corrects the one stored
-        constraints = [models.UniqueConstraint(fields = ['conversation', 'source'], name = 'feedback_conversation_source')]
+        # One row per conversation: pressing the other thumb corrects the verdict stored rather
+        # than leaving two of them on the same answer
+        constraints = [models.UniqueConstraint(fields = ['conversation'], name = 'feedback_conversation')]
         indexes = [models.Index(fields = ['-created', '-id'], name = 'feedback_created')]
 
     def getId(self):
@@ -262,9 +260,6 @@ class Feedback(models.Model):
 
     def getConversation(self):
         return self.conversation
-
-    def getSource(self):
-        return self.source
 
     def getScore(self):
         return self.score

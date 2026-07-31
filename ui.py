@@ -12,7 +12,6 @@ import altair
 import pandas
 import streamlit as st
 
-from musical_genres_rag.models import Feedback
 from musical_genres_rag.Rag import EmptyRagResponse, EmptyRetrievalError
 from musical_genres_rag.Report import (
     BATCH_PARAM,
@@ -613,7 +612,7 @@ def renderFeedback(conversation):
     # The widget hands its selection back on every rerun, and the rerun a thumb causes is only one
     # of them, so a verdict already stored is not written again on the next pass through the page.
     if st.session_state.get(SCORED_STATE) != [conversation.getId(), score]:
-        feedbackRepository.save(conversation, Feedback.Source.USER, score)
+        feedbackRepository.save(conversation, score)
         st.session_state[SCORED_STATE] = [conversation.getId(), score]
 
     st.caption(FEEDBACK_THANKS)

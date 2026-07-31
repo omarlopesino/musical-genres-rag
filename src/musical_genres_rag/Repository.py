@@ -117,16 +117,15 @@ class FeedbackRepository(RepositoryBase):
     def __init__(self):
         super().__init__(Feedback)
 
-    """Stores what a source made of one answer.
+    """Stores what the person who asked made of one answer.
 
     Written as an update where the row exists, so pressing the other thumb corrects the verdict
     rather than colliding with the conversation it was already stored under. Only the thumb is
-    written: a judgement already on that row is what somebody else made of the same answer.
+    written: a judgement already on that row is what a judge made of the same answer.
     """
-    def save(self, conversation, source, score = None):
+    def save(self, conversation, score = None):
         [feedback, _] = self.model.objects.update_or_create(
             conversation = conversation,
-            source = source,
             defaults = {'score': score},
         )
 
