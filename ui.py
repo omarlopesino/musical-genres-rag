@@ -184,6 +184,8 @@ CONVERSATION_LABELS = {
     'id': 'id',
     'question': 'query',
     'answer': 'answer',
+    'duration': 'seconds',
+    'cost': 'cost',
     'created': 'date',
     'feedback': 'feedback',
 }
@@ -316,6 +318,11 @@ def formatShare(share):
 # and two would read as nothing spent at all.
 def formatCost(cost):
     return '${cost:.4f}'.format(cost = cost) if cost is not None else UNSET
+
+
+# What a call took, or nothing on the answers stored before anybody was recording it
+def formatSeconds(seconds):
+    return '{seconds:.2f} s'.format(seconds = seconds) if seconds is not None else UNSET
 
 
 # A count of tokens, grouped so four figures of them are read at a glance. Written out rather than
@@ -473,6 +480,11 @@ def toConversationsFrame(conversations):
             'id': conversation.getId(),
             'question': conversation.getQuestion(),
             'answer': conversation.getAnswer()['answer']['answer'],
+            # What answering it took and cost. Dashes on the answers stored before either was
+            # recorded, and zero on the ones nothing was retrieved for: no model was asked, so
+            # none charged.
+            'duration': formatSeconds(conversation.getDuration()),
+            'cost': formatCost(conversation.getCost()),
             'created': conversation.getCreated().strftime(FULL_DATE_FORMAT),
             'feedback': conversationFeedbackUrl(conversation.getId()) if conversation.getFeedback() else None,
         }
