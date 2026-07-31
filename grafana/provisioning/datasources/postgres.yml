@@ -7,7 +7,7 @@ datasources:
     # Pinned, because the dashboards name it by this. Left to Grafana it would be generated afresh
     # on a new volume and every panel would come up pointing at nothing.
     uid: musical-genres-pg
-    type: postgres
+    type: grafana-postgresql-datasource
     url: $POSTGRES_HOST:5432
     user: $POSTGRES_USER
     database: $POSTGRES_DATABASE

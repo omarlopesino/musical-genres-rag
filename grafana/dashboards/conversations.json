@@ -19,7 +19,7 @@
       "type": "stat",
       "title": "Conversations",
       "description": "Questions answered in the range, rated or not",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "fieldConfig": {
         "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } },
@@ -35,7 +35,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -48,7 +48,7 @@
       "type": "stat",
       "title": "Median response time",
       "description": "The middle answer, so one slow call does not speak for the rest",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "fieldConfig": {
         "defaults": { "unit": "s", "decimals": 2, "color": { "mode": "fixed", "fixedColor": "text" } },
@@ -64,7 +64,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -77,7 +77,7 @@
       "type": "stat",
       "title": "Spend",
       "description": "Answering and judging together, at what the model charges",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "fieldConfig": {
         "defaults": { "unit": "currencyUSD", "decimals": 4, "color": { "mode": "fixed", "fixedColor": "text" } },
@@ -93,7 +93,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -106,7 +106,7 @@
       "type": "stat",
       "title": "Thumbs up",
       "description": "Share of the answers somebody rated that they rated well",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "fieldConfig": {
         "defaults": {
@@ -128,7 +128,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -141,7 +141,7 @@
       "type": "table",
       "title": "Recent conversations",
       "description": "The last twenty, beside whatever was made of them. Empty where nobody has rated one yet.",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 9, "w": 24, "x": 0, "y": 4 },
       "fieldConfig": {
         "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "auto" } } },
@@ -187,7 +187,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -200,7 +200,7 @@
       "type": "barchart",
       "title": "Model usage",
       "description": "Which model answered. Empty where nothing was retrieved and none was asked.",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 13 },
       "fieldConfig": {
         "defaults": {
@@ -220,7 +220,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -233,7 +233,7 @@
       "type": "piechart",
       "title": "Relevance",
       "description": "What the judge made of the answers it has read. The bands cut a stored score of 0 to 1 at 0.8 and 0.4.",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 13 },
       "fieldConfig": {
         "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
@@ -248,7 +248,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -261,7 +261,7 @@
       "type": "piechart",
       "title": "Thumbs",
       "description": "What the people who asked pressed",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 13 },
       "fieldConfig": {
         "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
@@ -276,7 +276,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "table",
@@ -289,7 +289,7 @@
       "type": "timeseries",
       "title": "Response time",
       "description": "One point per question asked: retrieval and the model together, which is what the person waited",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 21 },
       "fieldConfig": {
         "defaults": {
@@ -315,7 +315,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
@@ -328,7 +328,7 @@
       "type": "timeseries",
       "title": "Token usage",
       "description": "Averaged inside each bucket, because a long range holds more calls than there are points to draw",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 21 },
       "fieldConfig": {
         "defaults": {
@@ -354,7 +354,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
@@ -367,7 +367,7 @@
       "type": "timeseries",
       "title": "Cost",
       "description": "What answering cost, read against what judging those answers cost",
-      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 21 },
       "fieldConfig": {
         "defaults": {
@@ -391,7 +391,7 @@
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
@@ -399,7 +399,7 @@
         },
         {
           "refId": "B",
-          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "musical-genres-pg" },
           "editorMode": "code",
           "rawQuery": true,
           "format": "time_series",
