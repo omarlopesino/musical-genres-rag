@@ -241,6 +241,11 @@ class Feedback(models.Model):
     # What a judge made of the answer, reading it back against the context it was written from
     judgement = models.TextField(null = True)
     relevance = models.FloatField(null = True)
+    # What the judging call spent. Null until a judge has read the answer, and on a thumb, which
+    # somebody pressed themselves and which therefore cost nothing.
+    input_tokens = models.IntegerField(null = True)
+    output_tokens = models.IntegerField(null = True)
+    cost = models.FloatField(null = True)
     # Which run judged it, so a run links to the answers it read. Null until one has: a foreign key
     # may not point at a composite key, but a composite key may hold one, and this is that direction.
     judge_batch = models.ForeignKey(JudgeBatch, on_delete = models.PROTECT, related_name = 'judgements', null = True)
@@ -269,6 +274,15 @@ class Feedback(models.Model):
 
     def getRelevance(self):
         return self.relevance
+
+    def getInputTokens(self):
+        return self.input_tokens
+
+    def getOutputTokens(self):
+        return self.output_tokens
+
+    def getCost(self):
+        return self.cost
 
     def getJudgeBatch(self):
         return self.judge_batch

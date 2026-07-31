@@ -198,6 +198,9 @@ FEEDBACK_LABELS = {
     'answer': 'answer',
     'judgement': 'judgement',
     'relevance': 'relevance',
+    'input_tokens': 'input tokens',
+    'output_tokens': 'output tokens',
+    'cost': 'cost',
 }
 
 # Held narrow: what was asked, what was answered and what was made of it are all prose, and any of
@@ -225,6 +228,7 @@ FEEDBACK_SUMMARY = [
     ('Average relevance', 'relevance', 'What a judge made of the answers, on average'),
     ('Judgements', 'judgements', 'Answers a judge has read back'),
     ('Feedbacks', 'feedbacks', 'Answers somebody left feedback on, judged or not'),
+    ('Judge cost', 'cost', 'What the judge runs spent reading these answers back'),
 ]
 
 # Where a number or a verdict is not there to be shown, rather than a bare "None"
@@ -307,6 +311,18 @@ def formatScore(score):
 # The same, for the shares that are read as a percentage: nothing was pressed, so there is no share
 def formatShare(share):
     return '{share:.0%}'.format(share = share) if share is not None else '—'
+
+
+# What a call or a run of them cost. Four decimals because one judgement costs a fraction of a cent,
+# and two would read as nothing spent at all.
+def formatCost(cost):
+    return '${cost:.4f}'.format(cost = cost) if cost is not None else UNSET
+
+
+# A count of tokens, grouped so four figures of them are read at a glance. Written out rather than
+# left as a number so the column holds one type: a dash where there is nothing is still a cell.
+def formatCount(count):
+    return '{count:,}'.format(count = count) if count is not None else UNSET
 
 
 # The mean the evaluation itself worked out, or nothing when the run never scored that evaluator.
@@ -471,8 +487,9 @@ def toConversationsFrame(conversations):
 # LLM wrote and not the whole response stored beside it: the context it was written from is
 # thousands of characters, kept for a judge to read and not for a cell.
 #
-# The two columns a judge fills carry a dash until it has, so a row waiting to be judged reads as
-# one nobody has got to yet rather than as one with something missing from it.
+# The columns a judge fills carry a dash until it has, so a row waiting to be judged reads as one
+# nobody has got to yet rather than as one with something missing from it. A thumb keeps its dashes
+# for good: what a judge spent is what the judging cost, and pressing a thumb costs nothing.
 def toFeedbackFrame(feedbacks):
     rows = [
         {
@@ -482,6 +499,10 @@ def toFeedbackFrame(feedbacks):
             # The reasoning before the number it was given for, which is how a verdict is read
             'judgement': feedback.getJudgement() or UNSET,
             'relevance': formatScore(feedback.getRelevance()),
+            # What the judging call spent, the counts before the price they were charged at
+            'input_tokens': formatCount(feedback.getInputTokens()),
+            'output_tokens': formatCount(feedback.getOutputTokens()),
+            'cost': formatCost(feedback.getCost()),
         }
         for feedback in feedbacks
     ]
@@ -652,7 +673,7 @@ def chat():
 def renderFeedbackSummary(summary):
     st.markdown(SUMMARY_STYLE, unsafe_allow_html = True)
 
-    shown = {'positive': formatShare, 'relevance': formatScore}
+    shown = {'positive': formatShare, 'relevance': formatScore, 'cost': formatCost}
     for column, [label, name, tooltip] in zip(st.columns(len(FEEDBACK_SUMMARY)), FEEDBACK_SUMMARY):
         value = shown[name](summary[name]) if name in shown else summary[name]
         column.metric(label, value, help = tooltip)

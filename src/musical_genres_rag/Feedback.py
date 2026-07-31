@@ -1,5 +1,5 @@
 from musical_genres_rag.Progress import NULL_PROGRESS
-from musical_genres_rag.Rag import MODEL
+from musical_genres_rag.Rag import cost, MODEL
 from pydantic import BaseModel, Field
 from openai import OpenAI
 import json
@@ -103,7 +103,11 @@ class FeedbackRelevanceJudge:
             answer = json.dumps(answer['answer']),
         )
 
-    """The verdict on one answer, written onto the row it was read from, under the run that read it"""
+    """The verdict on one answer, written onto the row it was read from, under the run that read it.
+
+    What the call spent is written down beside the verdict it bought, so what a run cost is read off
+    the rows it judged rather than guessed from how many of them there were.
+    """
     def judge(self, feedback, batch):
         prompt = self.buildPrompt(feedback)
         input_messages = [
@@ -121,5 +125,10 @@ class FeedbackRelevanceJudge:
         feedback.judgement = result.judgement
         feedback.relevance = result.relevance
         feedback.judge_batch = batch
+
+        usage = response.usage
+        feedback.input_tokens = usage.input_tokens
+        feedback.output_tokens = usage.output_tokens
+        feedback.cost = cost(usage.input_tokens, usage.output_tokens)
 
         return self.repository.saveJudgement(feedback)

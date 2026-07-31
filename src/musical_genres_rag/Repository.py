@@ -1,4 +1,4 @@
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Sum
 
 from musical_genres_rag.models import Attachment, Conversation, EvaluationRun, Feedback, Genre, Instrument, JudgeBatch
 
@@ -143,9 +143,15 @@ class FeedbackRepository(RepositoryBase):
 
         return list(pending[:limit] if limit is not None else pending)
 
-    """What a judge made of an answer, written onto the row it read rather than beside it"""
+    """What a judge made of an answer, written onto the row it read rather than beside it.
+
+    Named fields, so a thumb pressed while the judge was reading is not written back over. What the
+    call spent is named among them: a field left off this list is assigned and never stored.
+    """
     def saveJudgement(self, feedback):
-        feedback.save(update_fields = ['judgement', 'relevance', 'judge_batch'])
+        feedback.save(update_fields = [
+            'judgement', 'relevance', 'judge_batch', 'input_tokens', 'output_tokens', 'cost',
+        ])
 
         return feedback
 
@@ -162,11 +168,14 @@ class FeedbackRepository(RepositoryBase):
 
         return list(feedbacks.order_by('-created', '-id'))
 
-    """The four numbers the feedback is read under, worked out where the rows are.
+    """The numbers the feedback is read under, worked out where the rows are.
 
     The thumbs are stored as 1 and 0, so their mean is the share of them that were positive.
     An average ignores the rows that never had one, and a count of judgements ignores the rows
     nobody has judged, which is what tells the two totals apart.
+
+    The cost is a total and not a mean: what was spent is spent whether it was spread over many
+    answers or a few. Nothing judged yet is nothing spent, which a sum gives as no number at all.
     """
     def getFeedbackSummary(self, since = None, until = None, batch = None, conversation = None):
         return self._filtered(since, until, batch, conversation).aggregate(
@@ -174,6 +183,7 @@ class FeedbackRepository(RepositoryBase):
             relevance = Avg('relevance'),
             judgements = Count('judgement'),
             feedbacks = Count('id'),
+            cost = Sum('cost'),
         )
 
     def _filtered(self, since = None, until = None, batch = None, conversation = None):
