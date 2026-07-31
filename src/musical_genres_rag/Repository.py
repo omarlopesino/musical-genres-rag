@@ -73,11 +73,13 @@ class EvaluationRunsRepository(RepositoryBase):
         )
 
     """The runs a filter asks for. An empty filter is no filter, so the page opens on everything"""
-    def findFiltered(self, types = None, embeddingModels = None, since = None, until = None):
+    def findFiltered(self, types = None, retrievers = None, embeddingModels = None, since = None, until = None):
         runs = self.model.objects.all()
 
         if types:
             runs = runs.filter(type__in = types)
+        if retrievers:
+            runs = runs.filter(retriever__in = retrievers)
         if embeddingModels:
             runs = runs.filter(embedding_model__in = embeddingModels)
         if since is not None:
@@ -90,6 +92,10 @@ class EvaluationRunsRepository(RepositoryBase):
     """The filter options come from what is actually stored, so a filter can never empty the list by itself"""
     def getTypes(self):
         return self._getDistinct('type')
+
+    """What searched, which two engines over the same weights only differ by"""
+    def getRetrievers(self):
+        return self._getDistinct('retriever')
 
     def getEmbeddingModels(self):
         return self._getDistinct('embedding_model')

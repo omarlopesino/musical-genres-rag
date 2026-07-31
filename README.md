@@ -21,8 +21,15 @@ In short, ask anything about any musical genre and you will get all the informat
 | `db` | Postgres with pgvector and BM25: the genres, the index, the conversations and the feedback | `postgres://localhost:5432/musical_genres` |
 | `redis` | Where a running task writes its progress, so whoever polls it reads what another process wrote | `redis://localhost:6379` |
 
-`make setup` is the first run: it installs, starts everything, migrates and seeds. The classes
-behind all of it are drawn in [architecture.md](docs/architecture.md).
+`make setup` is the first run: it installs, downloads the embedding weights, starts everything,
+migrates and seeds. The classes behind all of it are drawn in
+[architecture.md](docs/architecture.md).
+
+Every target that touches the index takes `ENGINE=`, which is `postgres_text` for bm25,
+`postgres_embed` for vectors or `postgres_hybrid` for both fused by rank — as in
+`make evaluateRetrieval ENGINE=postgres_hybrid`, which scores the index alone and costs nothing to
+re-run. The weights the vector engines embed with are fetched by `make downloadModel` and are not
+committed.
 
 ## Data license
 

@@ -2,20 +2,22 @@ empty :=
 space := $(empty) $(empty)
 .RECIPEPREFIX := $(space)
 
-.PHONY: setup build start stop drop psql migrate seed directories ingest rag groundtruth evaluate evaluateRetrieval createAnswers
+.PHONY: setup build start stop drop psql migrate seed directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers
 
 DB_NAME = musical_genres
 MANAGE = uv run python manage.py
 GROUND_TRUTH_DIRECTORY = tests/ground_truth
 
 # Which search engine the index, rag and evaluation targets run through, as in
-# "make evaluateRetrieval ENGINE=postgres_text". Left unset, each command uses its own default.
+# "make evaluateRetrieval ENGINE=postgres_hybrid". One of postgres_text, postgres_embed or
+# postgres_hybrid. Left unset, each command uses its own default.
 ENGINE ?=
 ENGINE_ARG = $(if $(ENGINE),--engine $(ENGINE))
 
 setup:
     uv sync
     $(MAKE) directories
+    $(MAKE) downloadModel
     docker compose down -v
     docker compose up -d --wait
     $(MAKE) migrate
@@ -48,6 +50,11 @@ migrate:
 # multi-statement script whose COPY reads server-side files under /data.
 seed:
     docker compose exec -T db psql -U postgres -d $(DB_NAME) -f /data/load.sql
+
+# Ninety megabytes of weights, which are not source and are not committed. Only the vector engines
+# read them, and this needs no database: it runs before the containers are up on purpose.
+downloadModel:
+    $(MANAGE) downloadModel
 
 ingest:
     $(MANAGE) ingest $(ENGINE_ARG)

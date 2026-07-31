@@ -29,6 +29,10 @@ UI_BASE_URL = os.getenv('UI_BASE_URL', 'http://localhost:8501')
 # on it, and the caller downloading that file is somewhere else, so the address cannot be our own.
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
 
+# Where the weights the vector engines embed with are read from. Downloaded by "make downloadModel"
+# rather than committed, and relative to the repository, which is what the containers mount.
+MODELS_DIRECTORY = Path(os.getenv('MODELS_DIRECTORY', BASE_DIR / 'models'))
+
 # The web layer is a JSON API and nothing else: no admin, auth, sessions or contenttypes, since
 # ninja serves it without templates, cookies or a CSRF token to carry.
 INSTALLED_APPS = [

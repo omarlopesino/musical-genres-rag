@@ -28,7 +28,8 @@ task it is followed by; what the work produced is read afterwards from `/progres
 
 Both body fields are optional, and a body of `{}` is a valid request:
 
-- `engine` is one of the engines the project knows, `postgres_text` today, defaulting to it. It is
+- `engine` is one of the engines the project knows — `postgres_text` for bm25, `postgres_embed` for
+  vectors, `postgres_hybrid` for both fused by rank — defaulting to `postgres_text`. It is
   the same list `--engine` takes on the command line. `/ground-truth` takes none, because the
   questions come straight from the repository and no index is searched; neither does
   `/feedback-judge`, which reads an answer back against the context the feedback row already

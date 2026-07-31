@@ -781,16 +781,17 @@ def selection():
     st.title('Evaluations')
     st.caption('Filter the runs, then open one to see its report.')
 
-    [typeColumn, modelColumn, dateColumn] = st.columns(3)
+    [typeColumn, retrieverColumn, modelColumn, dateColumn] = st.columns(4)
     # The options are whatever is stored, so a filter can never offer a value that empties the list
     types = typeColumn.multiselect('Type', repository.getTypes())
+    retrievers = retrieverColumn.multiselect('Retriever', repository.getRetrievers())
     embeddingModels = modelColumn.multiselect('Embedding model', repository.getEmbeddingModels())
     dates = dateColumn.date_input('Ran between', value = ())
 
     # The picker hands back nothing, one date or both, depending on how far through it the user is
     [since, until] = [*dates, None, None][:2]
 
-    runs = repository.findFiltered(types, embeddingModels, since, until)
+    runs = repository.findFiltered(types, retrievers, embeddingModels, since, until)
     if not runs:
         st.info('No evaluation run matches these filters.')
         return

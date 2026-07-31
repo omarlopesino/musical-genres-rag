@@ -3,6 +3,7 @@ from musical_genres_rag.Feedback import FeedbackRelevanceJudge
 from musical_genres_rag.Index import Index, PostgresSearchEngine
 from musical_genres_rag.Rag import GenresRag
 from musical_genres_rag.Repository import AttachmentsRepository, ConversationsRepository, EvaluationRunsRepository, FeedbackRepository, GenresRepository, JudgeBatchRepository
+from musical_genres_rag.Vectorizer import VectorizerDownload
 
 GENRE_INDEX_TABLE = 'genre_index'
 
@@ -11,12 +12,16 @@ GENRE_INDEX_TABLE = 'genre_index'
 The key must be what the engine's own getName() returns, since that is what lands in
 EvaluationRun.retriever and Attachment.engine, and what any comparison groups by.
 
-One entry so far. Adding vector or hybrid search means adding a builder here.
+Adding a way of searching means adding a builder here: the command line, the API and the dags all
+offer whatever this lists, and an evaluation groups by it.
 """
 ENGINES = {
     'postgres_text': lambda: PostgresSearchEngine(GENRE_INDEX_TABLE, 'text'),
+    'postgres_embed': lambda: PostgresSearchEngine(GENRE_INDEX_TABLE, 'embed'),
+    'postgres_hybrid': lambda: PostgresSearchEngine(GENRE_INDEX_TABLE, 'hybrid'),
 }
 
+# The one that reads no weights, so a chat that only ever answers questions loads no model to do it
 DEFAULT_ENGINE = 'postgres_text'
 
 """Builds the object graph on demand.
@@ -73,3 +78,6 @@ def buildGenresRetrievalEvaluationRunner(engine = DEFAULT_ENGINE):
 
 def buildGroundTruthAnswers(engine = DEFAULT_ENGINE):
     return GroundTruthAnswers(buildGenresRag(engine), buildAttachmentsRepository())
+
+def buildVectorizerDownload():
+    return VectorizerDownload()

@@ -11,11 +11,15 @@ log = logging.getLogger(__name__)
 # Where the app is reached is the connection's business, so the endpoints below are paths
 HTTP_CONN_ID = "musical_genres_rag"
 
+# Named one by one rather than read from the app: a dag is parsed by the scheduler, which imports
+# none of the project, so this list is kept in step with services.ENGINES by hand.
 DEFAULT_PARAMS = {
     "engine": Param(
         "postgres_text",
         enum = [
-            "postgres_text"
+            "postgres_text",
+            "postgres_embed",
+            "postgres_hybrid"
         ]
     )
 }

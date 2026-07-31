@@ -1,4 +1,6 @@
 from django.db import models
+from musical_genres_rag.Vectorizer import VECTOR_DIMENSIONS
+from pgvector.django import VectorField
 
 """Shared shape of every indexable entity: an id, a name and a description"""
 class EntityModel(models.Model):
@@ -83,11 +85,17 @@ class InstrumentGenres(models.Model):
 
 Deliberately not a foreign key: SearchEngine writes the entity id itself and is
 written to be generic over whichever table it is pointed at.
+
+Both columns are optional because an engine writes only what it searches: the text one indexes no
+vector, the vector one indexes no text, and the hybrid one is the only writer of both. The index
+each column is searched through is created by hand in a migration, since neither bm25 nor hnsw is
+something the ORM can express here.
 """
 class GenreIndex(models.Model):
 
     id = models.BigAutoField(primary_key = True)
-    content = models.TextField()
+    content = models.TextField(null = True)
+    embed = VectorField(dimensions = VECTOR_DIMENSIONS, null = True)
 
     class Meta:
         db_table = 'genre_index'

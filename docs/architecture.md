@@ -173,6 +173,23 @@ The `uv` scripts became `manage.py` subcommands, wired through `services.py`:
 | `manage.py groundtruth [--output]` | Regenerates the ground truth question set |
 | `manage.py debug [--mode]` | `renderers`, `genres` or `queries` inspection |
 
-`PostgresSearchEngine` still issues raw SQL through `django.db.connection`: the bm25
-operator (`content <@> to_bm25query(...)`) has no ORM expression, and the same will be
-true of the hybrid query once a pgvector column is added.
+| `manage.py downloadModel` | Fetches the weights the vector engines embed with |
+
+`PostgresSearchEngine` still issues raw SQL through `django.db.connection`: neither the bm25
+operator (`content <@> to_bm25query(...)`) nor the distance one (`embed <=> '[…]'::vector`) has an
+ORM expression.
+
+## Searching
+
+One engine, three modes, named after what each of them writes and searches:
+
+| Engine | Writes | Searches by | Embedded by |
+|---|---|---|---|
+| `postgres_text` | `genre_index.content` | bm25, over `genre_index_text` | the renderer alone |
+| `postgres_embed` | `genre_index.embed` | cosine distance, over the hnsw index | `Xenova/all-MiniLM-L6-v2`, run locally through ONNX |
+| `postgres_hybrid` | both | both, fused by `ReciprocalRankFusion` | both |
+
+`hybrid` reads each half deeper than the limit asked for and then cuts back to it, adding
+`1 / (60 + rank)` per ranking: a bm25 score and a cosine distance are not the same kind of number
+and are never added, so only the rank each half gave is read. `Vectorizer` keeps one ONNX session
+per process — an embedder is built per entity indexed, and the weights are read off disk once.
