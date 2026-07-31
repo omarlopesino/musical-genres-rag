@@ -290,5 +290,8 @@ class Feedback(models.Model):
     def getCreated(self):
         return self.created
 
+    # Named by the conversation it is unique under. That one is named by its id and not by its
+    # question: reading the question back is a second query, and a row says what it is without
+    # going to look.
     def __str__(self):
-        return self.question
+        return 'feedback on conversation {conversation}'.format(conversation = self.conversation_id)
