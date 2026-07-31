@@ -1,0 +1,411 @@
+{
+  "id": null,
+  "uid": "musical-genres-conversations",
+  "title": "Conversations",
+  "description": "What the RAG is answering, how long it takes, what it costs and what is made of it",
+  "tags": ["musical-genres"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Conversations",
+      "description": "Questions answered in the range, rated or not",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) AS conversations\nFROM conversation\nWHERE created BETWEEN $__timeFrom() AND $__timeTo()"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Median response time",
+      "description": "The middle answer, so one slow call does not speak for the rest",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 2, "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration) AS median_duration\nFROM conversation\nWHERE duration IS NOT NULL\n  AND created BETWEEN $__timeFrom() AND $__timeTo()"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Spend",
+      "description": "Answering and judging together, at what the model charges",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "decimals": 4, "color": { "mode": "fixed", "fixedColor": "text" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT\n  (SELECT COALESCE(SUM(cost), 0) FROM conversation WHERE created BETWEEN $__timeFrom() AND $__timeTo())\n  + (SELECT COALESCE(SUM(cost), 0) FROM feedback WHERE created BETWEEN $__timeFrom() AND $__timeTo())\n  AS spend"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Thumbs up",
+      "description": "Share of the answers somebody rated that they rated well",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "min": 0,
+          "max": 1,
+          "color": { "mode": "fixed", "fixedColor": "text" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT AVG(score) AS positive\nFROM feedback\nWHERE score IS NOT NULL\n  AND created BETWEEN $__timeFrom() AND $__timeTo()"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Recent conversations",
+      "description": "The last twenty, beside whatever was made of them. Empty where nobody has rated one yet.",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "auto" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "duration" },
+            "properties": [
+              { "id": "unit", "value": "s" },
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 90 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "cost" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 5 },
+              { "id": "custom.width", "value": 100 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "relevance" },
+            "properties": [
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 90 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "score" },
+            "properties": [{ "id": "custom.width", "value": 70 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "answer" },
+            "properties": [{ "id": "custom.cellOptions", "value": { "type": "auto", "wrapText": true } }]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": { "show": false, "reducer": ["sum"], "countRows": false, "fields": "" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT\n  c.created AS time,\n  c.question,\n  c.answer->'answer'->>'answer' AS answer,\n  c.duration,\n  c.cost,\n  f.score,\n  f.relevance\nFROM conversation c\nLEFT JOIN feedback f ON f.conversation_id = c.id\nWHERE c.created BETWEEN $__timeFrom() AND $__timeTo()\nORDER BY c.created DESC\nLIMIT 20"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Model usage",
+      "description": "Which model answered. Empty where nothing was retrieved and none was asked.",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 13 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 80, "axisPlacement": "auto" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "xTickLabelRotation": 0,
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT COALESCE(model, 'no model asked') AS model, COUNT(*) AS count\nFROM conversation\nWHERE created BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY count DESC"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "piechart",
+      "title": "Relevance",
+      "description": "What the judge made of the answers it has read. The bands cut a stored score of 0 to 1 at 0.8 and 0.4.",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 13 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "pie",
+        "reduceOptions": { "calcs": [], "fields": "", "values": true },
+        "displayLabels": ["percent"],
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom", "values": ["value"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT\n  CASE\n    WHEN relevance >= 0.8 THEN 'relevant'\n    WHEN relevance >= 0.4 THEN 'partly relevant'\n    ELSE 'not relevant'\n  END AS relevance,\n  COUNT(*) AS count\nFROM feedback\nWHERE relevance IS NOT NULL\n  AND created BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "piechart",
+      "title": "Thumbs",
+      "description": "What the people who asked pressed",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 13 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "pie",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "displayLabels": ["percent"],
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom", "values": ["value"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT\n  SUM(CASE WHEN score > 0 THEN 1 ELSE 0 END) AS thumbs_up,\n  SUM(CASE WHEN score = 0 THEN 1 ELSE 0 END) AS thumbs_down\nFROM feedback\nWHERE score IS NOT NULL\n  AND created BETWEEN $__timeFrom() AND $__timeTo()"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Response time",
+      "description": "One point per question asked: retrieval and the model together, which is what the person waited",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 21 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": true,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT\n  created AS time,\n  duration\nFROM conversation\nWHERE duration IS NOT NULL\n  AND created BETWEEN $__timeFrom() AND $__timeTo()\nORDER BY created"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Token usage",
+      "description": "Averaged inside each bucket, because a long range holds more calls than there are points to draw",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 21 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "showPoints": "auto",
+            "pointSize": 5,
+            "spanNulls": true,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroup(created, $__interval) AS time,\n  AVG(input_tokens) AS read,\n  AVG(output_tokens) AS written\nFROM conversation\nWHERE created BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Cost",
+      "description": "What answering cost, read against what judging those answers cost",
+      "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 21 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4,
+          "min": 0,
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 70,
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroup(created, $__interval) AS time,\n  SUM(cost) AS answering\nFROM conversation\nWHERE cost > 0\n  AND created BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "postgres", "uid": "musical-genres-pg" },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT\n  $__timeGroup(created, $__interval) AS time,\n  SUM(cost) AS judging\nFROM feedback\nWHERE cost > 0\n  AND created BETWEEN $__timeFrom() AND $__timeTo()\nGROUP BY 1\nORDER BY 1"
+        }
+      ]
+    }
+  ]
+}

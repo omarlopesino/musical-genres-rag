@@ -1,0 +1,21 @@
+# The database the app writes to, read here rather than through it. The credentials come from the
+# environment the container was started with, which is the same .env everything else reads.
+apiVersion: 1
+
+datasources:
+  - name: musical-genres
+    # Pinned, because the dashboards name it by this. Left to Grafana it would be generated afresh
+    # on a new volume and every panel would come up pointing at nothing.
+    uid: musical-genres-pg
+    type: postgres
+    url: $POSTGRES_HOST:5432
+    user: $POSTGRES_USER
+    database: $POSTGRES_DATABASE
+    secureJsonData:
+      password: $POSTGRES_PASSWORD
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1800
+    isDefault: true
+    # Provisioned from this file, so the file is where it is changed
+    editable: false

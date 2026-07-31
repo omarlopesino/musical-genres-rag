@@ -114,8 +114,38 @@ services:
       # First boot migrates the metadata database before anything answers
       start_period: 90s
 
+  # The dashboard over live traffic, reading the same database the chat writes its conversations to.
+  # Its data source and its dashboards are provisioned out of this repository, so a fresh volume comes
+  # up already wired rather than waiting for somebody to fill a form in.
+  grafana:
+    container_name: ${PROJECT_NAME}_grafana
+    image: grafana/grafana:12.3.0
+    env_file: .env
+    environment:
+      # The provisioned data source names the database by these, and from inside this network it is
+      # not the host the .env reaches
+      POSTGRES_HOST: db
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      # Whatever is built through the UI, kept across restarts of the container
+      - mgr_grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   mgr_pgdata:
   mgr_ui_venv:
   mgr_app_venv:
   mgr_airflow_home:
+  mgr_grafana_data:

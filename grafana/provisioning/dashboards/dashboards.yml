@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: musical-genres
+    type: file
+    # Panels can still be dragged about while a dashboard is being worked on. The file is what comes
+    # back on a restart, so anything worth keeping is exported back into it.
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
