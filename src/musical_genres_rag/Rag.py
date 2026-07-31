@@ -25,6 +25,15 @@ CONTEXT:
 
 MODEL = 'gpt-5.4-mini'
 
+# What the model charges, in dollars per million tokens. Writing costs six times reading, which is
+# why a cost is worked out from the two counts and never from their sum.
+INPUT_PRICE_PER_MILLION = 0.75
+OUTPUT_PRICE_PER_MILLION = 4.50
+
+"""What one call cost, in dollars, from what it read and what it wrote"""
+def cost(input_tokens, output_tokens):
+    return (input_tokens * INPUT_PRICE_PER_MILLION + output_tokens * OUTPUT_PRICE_PER_MILLION) / 1_000_000
+
 """What an answer reads like when the context does not hold it, whether the LLM said so or nothing was retrieved"""
 UNKNOWN_ANSWER = "I don't know."
 

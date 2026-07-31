@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from musical_genres_rag.models import Attachment, EvaluationRun
 from musical_genres_rag.Progress import NULL_PROGRESS
-from musical_genres_rag.Rag import EmptyRagResponse, EmptyRetrievalError, UNKNOWN_ANSWER
+from musical_genres_rag.Rag import cost, EmptyRagResponse, EmptyRetrievalError, UNKNOWN_ANSWER
 from musical_genres_rag.Renderer import EntityRenderer
 from typing import List, Literal
 from datetime import datetime
@@ -443,16 +443,14 @@ class ResponseGenerationTime(Evaluator):
         response = ctx.output
         return response['duration']
 
-"""Checks if the output contains the genre"""
+"""What the answer cost, beside the two counts it was worked out from"""
 class Cost(Evaluator):
     def evaluate(self, ctx: EvaluatorContext):
         response = ctx.output
-        input_cost = response['input_tokens'] / 1_000_000 * 0.6
-        output_cost = response['output_tokens'] / 1_000_000 * 0.4
         return {
-            'input_tokens': float(ctx.output['input_tokens']),
-            'output_tokens': float(ctx.output['output_tokens']),
-            'total_cost': input_cost + output_cost,
+            'input_tokens': float(response['input_tokens']),
+            'output_tokens': float(response['output_tokens']),
+            'total_cost': cost(response['input_tokens'], response['output_tokens']),
         }
 
 """Retrieval and generation fail independently, so the pair is what tells them apart"""
