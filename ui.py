@@ -196,13 +196,13 @@ FEEDBACK_LABELS = {
     'id': 'id',
     'question': 'question',
     'answer': 'answer',
-    'relevance': 'relevance',
     'judgement': 'judgement',
+    'relevance': 'relevance',
 }
 
-# Held narrow: an answer and the judgement of it are both prose, and either would take the width
-# from the rest of the row on its own
-NARROW_FEEDBACK = ['answer', 'relevance', 'judgement']
+# Held narrow: what was asked, what was answered and what was made of it are all prose, and any of
+# them would take the width from the rest of the row on its own
+NARROW_FEEDBACK = ['question', 'answer', 'judgement', 'relevance']
 
 # What the feedback page is narrowed to comes off the url under the names Report.py writes its
 # links with, so the end that reads them and the end that builds them cannot drift apart.
@@ -479,8 +479,9 @@ def toFeedbackFrame(feedbacks):
             'id': feedback.getId(),
             'question': feedback.getConversation().getQuestion(),
             'answer': feedback.getConversation().getAnswer()['answer']['answer'],
-            'relevance': formatScore(feedback.getRelevance()),
+            # The reasoning before the number it was given for, which is how a verdict is read
             'judgement': feedback.getJudgement() or UNSET,
+            'relevance': formatScore(feedback.getRelevance()),
         }
         for feedback in feedbacks
     ]
