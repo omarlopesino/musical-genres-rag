@@ -661,7 +661,7 @@ def chat():
         # Registered with the answer and not with the thumb, so every answer given is stored whether
         # anybody goes on to rate it or not. It is what the page reads back on every rerun from here
         # on, and what any verdict on this answer is stored against.
-        st.session_state[CONVERSATION_STATE] = conversationRepository.create(question, response.toDict())
+        st.session_state[CONVERSATION_STATE] = conversationRepository.create(question, response)
 
     renderAnswer()
 

@@ -104,9 +104,21 @@ class ConversationsRepository(RepositoryBase):
         # being asked for one conversation at a time
         super().__init__(Conversation, prefetch = ('feedback',))
 
-    """Every answer given is one of these, whether anybody went on to rate it or not"""
-    def create(self, question, answer):
-        return self.model.objects.create(question = question, answer = answer)
+    """Every answer given is one of these, whether anybody went on to rate it or not.
+
+    Takes the response rather than what it serializes to, so what the call took and spent is
+    stored beside the answer without the caller taking it apart first.
+    """
+    def create(self, question, response):
+        return self.model.objects.create(
+            question = question,
+            answer = response.toDict(),
+            duration = response.getDuration(),
+            input_tokens = response.getInputTokens(),
+            output_tokens = response.getOutputTokens(),
+            cost = response.getCost(),
+            model = response.getModel(),
+        )
 
     """Every conversation, newest first. Ties break on id so two inside the same second still order"""
     def findLatest(self):

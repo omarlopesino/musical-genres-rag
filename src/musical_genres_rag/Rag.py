@@ -71,6 +71,14 @@ class RagResponse:
     def getOutputTokens(self):
         return self.response.usage.output_tokens
 
+    """What this call cost, priced as the model charges rather than stored beside the counts"""
+    def getCost(self):
+        return cost(self.getInputTokens(), self.getOutputTokens())
+
+    """Which model wrote it, as the API resolved it rather than as the constant asked for it"""
+    def getModel(self):
+        return self.response.model
+
     def toDict(self):
         return {
             "query": self.query,
@@ -135,6 +143,10 @@ class EmptyRagResponse(RagResponse):
 
     def getOutputTokens(self):
         return 0
+
+    """No model wrote this one: nothing was retrieved, so nothing was asked of any of them"""
+    def getModel(self):
+        return None
 
 class Rag:
 

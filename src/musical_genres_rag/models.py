@@ -194,10 +194,21 @@ class Conversation(models.Model):
     id = models.BigAutoField(primary_key = True)
     question = models.CharField(max_length = 255)
     answer = models.JSONField()
+    # What the answering call took, in seconds, and what it read, wrote and spent. The answer holds
+    # these too, as the call reported them; they are columns as well because a dashboard reads them
+    # a time range at a time and would otherwise dig through the JSON on every row.
+    duration = models.FloatField(null = True)
+    input_tokens = models.IntegerField(null = True)
+    output_tokens = models.IntegerField(null = True)
+    cost = models.FloatField(null = True)
+    # Which model answered, as the API resolved it. Null where none was asked, and on the rows
+    # stored before anybody recorded it.
+    model = models.CharField(max_length = 64, null = True)
     created = models.DateTimeField(auto_now_add = True)
 
     class Meta:
         db_table = 'conversation'
+        indexes = [models.Index(fields = ['-created', '-id'], name = 'conversation_created')]
 
     def getId(self):
         return self.id
@@ -207,6 +218,21 @@ class Conversation(models.Model):
 
     def getAnswer(self):
         return self.answer
+
+    def getDuration(self):
+        return self.duration
+
+    def getInputTokens(self):
+        return self.input_tokens
+
+    def getOutputTokens(self):
+        return self.output_tokens
+
+    def getCost(self):
+        return self.cost
+
+    def getModel(self):
+        return self.model
 
     def getCreated(self):
         return self.created
