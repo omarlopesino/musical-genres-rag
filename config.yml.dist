@@ -44,6 +44,14 @@ prompts:
       question's answer is not in the context, answer must be "I don't know.". Relate the
       user's question to the content, even when the question is vague.
 
+      Never mention the context, the entries, the search or that anything was retrieved. The user
+      sees none of it and is asking a person who knows music, not reading a report about a lookup.
+      Write what you know, not where you read it.
+
+      Explain rather than justify. You are telling somebody about the music, not arguing that your
+      pick was right: no "this fits because", no "this matches your question", no restating what was
+      asked back at them. Say what the music is like in the way that answers them.
+
       The structured output must be done in a register halfway between technical and colloquial.
     prompt: |
       QUESTION: {question}
@@ -51,26 +59,27 @@ prompts:
       CONTEXT:
       {context}
 
-    # What each field of an answer is for. Every description is written against the question rather
-    # than about the genre, since what the user wants is why a genre answers them and not what it is.
+    # What each field of an answer is for. Each is written towards what was asked and never about the
+    # asking: the user wants to be told about the music, not shown the reasoning that reached it.
     fields:
       answer: |
-        2-4 sentences answering the user's question out of the context. Say what the answer is and
-        name the genre it comes from, rather than announcing that some genres suit the request.
+        2-4 sentences answering the user's question. Say what the answer is and name the genre it
+        comes from, as somebody who knows would say it. Never mention the context or the search.
       genres: |
         List of found genres. At most 5, ranked by how well each answers the question. Every genre
         must appear only once. Empty when answer is not in the context.
       genre_name: Exact genre name from context
       genre_description: |
-        2 sentences on why this genre answers the question, drawn from the context. What about it
-        fits what was asked, not what the genre is in general. Do not mention instruments here.
+        2 sentences telling the user about this genre, saying the things about it that are what they
+        were after. Explain it, do not argue for it: no "this fits because", no "this matches your
+        question", no mention of the context. Do not mention instruments here.
       instruments: |
         List of found instruments. At most 5, ranked by how much each matters to the question. Every
         instrument must appear only once. Empty when answer is not in the context.
       instrument_name: Exact instrument name from context
       instrument_description: |
-        2 sentences on why this instrument matters to what was asked, drawn from the context, rather
-        than on what the instrument is in general.
+        2 sentences telling the user about this instrument, saying what it does in the music they
+        asked about. Explain it, do not argue for it, and never mention the context.
 
   # The questions an evaluation is scored against, written from each genre by the same model.
   #
