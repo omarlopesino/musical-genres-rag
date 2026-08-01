@@ -165,7 +165,7 @@ class PostgresSearchEngine(SearchEngine):
             limit = sql.Literal(limit)
         )
 
-        return self._fetchIds(sqlQuery, [Vectorizer.getShared().encode(query)])
+        return self._fetchIds(sqlQuery, [Vectorizer.getShared().encodeQuery(query)])
 
     """Both searches, fused by the rank each of them gave rather than by the score.
 

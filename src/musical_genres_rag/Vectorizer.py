@@ -24,6 +24,27 @@ MODEL_CANDIDATES = ['onnx/model.onnx', 'onnx/encoder_model.onnx', MODEL_FILE]
 # read back by the name the graph refers to them as
 WEIGHTS_SUFFIX = '_data'
 
+"""How a model's tokens become one vector. Not written in the graph, and pooling the wrong way only
+ever shows up as worse results"""
+MEAN_POOLING = 'mean'
+CLS_POOLING = 'cls'
+
+"""What a model needs beyond its weights, keyed as the hub names it: how it is pooled, and what each
+side of an asymmetric pair is prefixed with.
+
+Both belong to the model rather than to a deployment, so they are here and not in config.yml beside
+its name. Anything unlisted is mean pooled and prefixed with nothing.
+"""
+BGE_QUERY_PREFIX = 'Represent this sentence for searching relevant passages: '
+
+MODEL_PROFILES = {
+    'Xenova/bge-small-en-v1.5': (CLS_POOLING, BGE_QUERY_PREFIX, ''),
+    'Xenova/bge-base-en-v1.5': (CLS_POOLING, BGE_QUERY_PREFIX, ''),
+    'Xenova/e5-small-v2': (MEAN_POOLING, 'query: ', 'passage: '),
+}
+
+DEFAULT_PROFILE = (MEAN_POOLING, '', '')
+
 """How much of a document the model reads.
 
 Said here rather than left to the tokenizer file, which ships a truncation of its own at 128 tokens:
@@ -85,6 +106,10 @@ class Vectorizer:
 
         self.numpy = numpy
         directory = directory if directory is not None else getModelDirectory()
+        [self.pooling, self.queryPrefix, self.documentPrefix] = MODEL_PROFILES.get(
+            MODEL_REPOSITORY,
+            DEFAULT_PROFILE,
+        )
 
         self.tokenizer = Tokenizer.from_file(str(self._require(directory / TOKENIZER_FILE)))
         self.tokenizer.enable_truncation(max_length = MAX_TOKENS)
@@ -95,16 +120,32 @@ class Vectorizer:
         )
         self.inputs = {input.name for input in self.session.get_inputs()}
 
-    """One text, as the literal a vector column is written and searched by"""
-    def encode(self, text):
-        [vector] = self.encodeMultiple([text])
+    """One document, as the literal a vector column is written by"""
+    def encodeDocument(self, text):
+        [vector] = self.encodeDocuments([text])
 
         return vector
 
-    def encodeMultiple(self, texts):
-        return [self._toLiteral(vector) for vector in self._pool(texts)]
+    def encodeDocuments(self, texts):
+        return self._encode(texts, self.documentPrefix)
 
-    """Mean pooling over the tokens that are not padding, brought to unit length.
+    """One question, as the literal a vector column is searched by.
+
+    Kept apart from a document because an asymmetric model reads the two sides differently, and says
+    so only through what each is prefixed with. For a symmetric one both prefixes are empty.
+    """
+    def encodeQuery(self, text):
+        [vector] = self._encode([text], self.queryPrefix)
+
+        return vector
+
+    def _encode(self, texts, prefix):
+        return [
+            self._toLiteral(vector)
+                for vector in self._pool([prefix + text for text in texts])
+        ]
+
+    """The tokens as one vector, pooled as the model was trained to be read and brought to unit length.
 
     Unit length is what makes the cosine distance the index is built on the same ordering as the dot
     product, and what keeps two documents of different lengths comparable at all.
@@ -120,10 +161,18 @@ class Vectorizer:
         feed = {name: value for name, value in feed.items() if name in self.inputs}
 
         [hidden, *rest] = self.session.run(None, feed)
-        mask = feed['attention_mask'][..., None]
-        pooled = (hidden * mask).sum(axis = 1) / mask.sum(axis = 1)
+        pooled = self._reduce(hidden, feed['attention_mask'])
 
         return pooled / self.numpy.linalg.norm(pooled, axis = 1, keepdims = True)
+
+    """The first token, or the average of every token that is not padding"""
+    def _reduce(self, hidden, attentionMask):
+        if self.pooling == CLS_POOLING:
+            return hidden[:, 0]
+
+        mask = attentionMask[..., None]
+
+        return (hidden * mask).sum(axis = 1) / mask.sum(axis = 1)
 
     def _toArray(self, rows):
         return self.numpy.array(rows, dtype = self.numpy.int64)

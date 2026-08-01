@@ -24,11 +24,16 @@ class TextEmbedder(Embedder):
         renderer = EntityRenderer(self.entity)
         return renderer.render()
 
-"""The same rendered text the text engine indexes, as the vector an index is searched by"""
-class VectorEmbedder(TextEmbedder):
+"""The genre as prose, as the vector an index is searched by.
+
+Rendered apart from what the text engine indexes: a word index is unharmed by the keys and the ids,
+a pooled vector is diluted by them.
+"""
+class VectorEmbedder(Embedder):
 
     def embed(self):
-        return Vectorizer.getShared().encode(super().embed())
+        renderer = EntityRenderer(self.entity)
+        return Vectorizer.getShared().encodeDocument(renderer.render('prose'))
 
     @classmethod
     def getModelName(cls):

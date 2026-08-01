@@ -57,16 +57,11 @@ class JsonRenderer(Renderer):
 
         return finalValue
 
-"""The same properties as prose, for whatever reads an entity for its meaning rather than its words.
+"""The properties as prose, for a model that reads meaning rather than words.
 
-A vector is what a model makes of a whole document at once, so everything the text rendering carries
-to help a word match — a key on every line, the "#0" a list index leaves behind, and ids, which are
-numbers that mean nothing to a model reading for sense — arrives in an embedding as noise. Only what
-the entity says about itself is emitted here.
-
-The related entities are named and not described. Their descriptions are what the entity's own
-description is up against once the whole document is pooled into one vector, and scored against the
-ground truth they cost more than they return.
+Keys, the "#0" a list index leaves behind and ids are all noise once a document is pooled into one
+vector, so none are emitted. Relations are named and not described: their descriptions dilute the
+entity's own.
 """
 class ProseRenderer(Renderer):
 
@@ -88,7 +83,7 @@ class ProseRenderer(Renderer):
 
         return ' '.join(['. '.join(sentences) + '.', *relations])
 
-    """A relation as the names in it, under the name the entity knows them by"""
+    """A relation as its names, under the property they belong to"""
     def renderProperty(self, property, value):
         return '{property}: {names}.'.format(
             property = property,
