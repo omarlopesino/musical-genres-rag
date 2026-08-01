@@ -17,7 +17,7 @@ models:
   # The embedding model, as it is named on the hub. "make downloadModel" fetches this one, the vector
   # engines read it, and an evaluation records it under this name. A model returning a vector of a
   # different width also needs the index column redeclared, which is a migration.
-  embedding: Xenova/all-MiniLM-L6-v2
+  embedding: Xenova/bge-small-en-v1.5
 
 # What is said to the model, and how what it is asked about is laid out for it.
 #
