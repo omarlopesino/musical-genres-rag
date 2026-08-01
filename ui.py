@@ -117,21 +117,28 @@ HIDDEN_EVALUATORS = [
     'output_tokens',
     # Only ever 1 where the genre was named and 0 where it was not, which the gauges already say
     'GenreRagGenreMrr',
-    # The two the gauges are drawn from. Whether the genre was retrieved is read off the expected
+    'GenreRagFamilyMrr',
+    # The ones the gauges are drawn from. Whether the genre was retrieved is read off the expected
     # genre against the answer, so the column repeated what the row already showed.
     'HitRate',
     'GenreRagGenreHit',
+    'GenreRagFamilyHit',
 ]
 
 # Where a rate is kept once the evaluation has worked it out for each boolean evaluator on its own
 ASSERTION_RATES = 'assertion_rates'
 
-# The evaluators worth a gauge, under the heading each is drawn with. Both answer the same question
-# at a different point of the pipeline, so neither is named after the metric behind it. The heading
-# is the label under its column, so it is short enough to sit there.
+# The evaluators worth a gauge, under the heading each is drawn with. They answer the same question
+# at a different point of the pipeline, so none is named after the metric behind it. The heading is
+# the label under its column, so it is short enough to sit there.
+#
+# The last one accepts a parent or a child of the expected genre, so it never reads below the one
+# before it: the gap between the two is how much of a miss was only ever a matter of which name the
+# ground truth happened to write down.
 FOUND_CHARTS = {
     'HitRate': 'By the search',
     'GenreRagGenreHit': 'In the answer',
+    'GenreRagFamilyHit': 'Or its family',
 }
 
 FOUND_LABEL = 'found'
