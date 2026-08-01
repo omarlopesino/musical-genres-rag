@@ -28,6 +28,14 @@ def cost(input_tokens, output_tokens):
 """What an answer reads like when the context does not hold it, whether the LLM said so or nothing was retrieved"""
 UNKNOWN_ANSWER = "I don't know."
 
+"""What one field of an answer is for, as the model is told it.
+
+Prompt and not schema: the model is asked for a field by what it is described as, so it is read from
+the file the rest of the prompt is in.
+"""
+def fieldDescription(field):
+    return Config.getShared().getPrompt('rag.fields.{field}'.format(field = field))
+
 class RagResponse:
 
     def __init__(self, query, retrieved, response, duration, prompt = None):
@@ -89,17 +97,17 @@ class RagResponse:
         return renderer.render('json')
 
 class Instrument(BaseModel):
-    name: str = Field(description = "Exact instrument name from context")
-    description: str = Field(description = "2 sentences that describes the Instrument, replying to user's question. Use information from context")
+    name: str = Field(description = fieldDescription('instrument_name'))
+    description: str = Field(description = fieldDescription('instrument_description'))
 
 class Genre(BaseModel):
-    name: str = Field(description = "Exact genre name from context")
-    description: str = Field(description = "2 sentences that describes the genre, replying to user's question. Use information from context. Do not mention instruments here.")
+    name: str = Field(description = fieldDescription('genre_name'))
+    description: str = Field(description = fieldDescription('genre_description'))
 
 class GenresRagResponse(BaseModel):
-    answer: str = Field(description = "2-4 sentences containing the answer to the user question based on the context.")
-    genres: List[Genre] = Field(description = "List of found genres. At most 5, ranked by relevance to the question. Every genre must appear only once. Empty when answer is not in the context.")
-    instruments: List[Instrument] = Field(description = "List of found instruments. At most 5, ranked by relevance to the question. Every instrument must appear only once. Empty when answer is not in the context.")
+    answer: str = Field(description = fieldDescription('answer'))
+    genres: List[Genre] = Field(description = fieldDescription('genres'))
+    instruments: List[Instrument] = Field(description = fieldDescription('instruments'))
 
 """Raised instead of prompting an LLM with a context the index never filled"""
 class EmptyRetrievalError(RuntimeError):

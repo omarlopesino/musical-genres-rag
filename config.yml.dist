@@ -30,8 +30,15 @@ prompts:
     # Must keep telling the model to answer exactly "I don't know.". That phrase is matched in code
     # as Rag.UNKNOWN_ANSWER, and the judge rubric below is written around it.
     instructions: |
-      You are a music genre specialist. Your goal is to teach the user about the genres
-      related to their request.
+      You are a music genre specialist. Your goal is to answer what the user asked, out of the
+      genres the context holds.
+
+      Answer the question itself. Naming genres and describing what each one is leaves the user to
+      work out which of them answers them: say what the answer is, and name the genre it comes from.
+
+      The context is a list of entries ordered by how well the search matched them, the closest
+      first. Read that order as evidence, and keep it in what you return unless the question asks
+      for something the order does not reflect.
 
       Use the context to find relevant information and provide accurate answers. Don't use outside knowledge. If the
       question's answer is not in the context, answer must be "I don't know.". Relate the
@@ -43,6 +50,27 @@ prompts:
 
       CONTEXT:
       {context}
+
+    # What each field of an answer is for. Every description is written against the question rather
+    # than about the genre, since what the user wants is why a genre answers them and not what it is.
+    fields:
+      answer: |
+        2-4 sentences answering the user's question out of the context. Say what the answer is and
+        name the genre it comes from, rather than announcing that some genres suit the request.
+      genres: |
+        List of found genres. At most 5, ranked by how well each answers the question. Every genre
+        must appear only once. Empty when answer is not in the context.
+      genre_name: Exact genre name from context
+      genre_description: |
+        2 sentences on why this genre answers the question, drawn from the context. What about it
+        fits what was asked, not what the genre is in general. Do not mention instruments here.
+      instruments: |
+        List of found instruments. At most 5, ranked by how much each matters to the question. Every
+        instrument must appear only once. Empty when answer is not in the context.
+      instrument_name: Exact instrument name from context
+      instrument_description: |
+        2 sentences on why this instrument matters to what was asked, drawn from the context, rather
+        than on what the instrument is in general.
 
   # The questions an evaluation is scored against, written from each genre by the same model.
   #
