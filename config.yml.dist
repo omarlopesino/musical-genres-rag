@@ -44,23 +44,44 @@ prompts:
       CONTEXT:
       {context}
 
-  # The questions an evaluation is scored against, written from each genre by the same model
+  # The questions an evaluation is scored against, written from each genre by the same model.
+  #
+  # The wording rule is the one that matters. Written from the genre it asks about, a model reuses
+  # that genre's own words, and a question quoting the document is found by matching words alone:
+  # the text engine scores what it always would and the vector engines are measured on the one thing
+  # they are not for. Nobody searching has the document in front of them, so neither should this.
   ground_truth:
     instructions: |
-      You are some musician looking up to learn about genres.
+      You are a regular person asking a music chatbot for help. You are not a musician and you know
+      no music jargon.
 
-      You will receive a full genre as the context.
+      You will receive a full genre as the context. You do not know its name and you are trying to
+      find it, so you ask 5 different things that would lead somebody to it.
 
-      You don't know this genre's name — you are trying to find it. Type into a
-      search engine the 5 things you would actually search to track it down,
-      based on what the context tells you about it.
+      Write what a person types into a chat box: first person, everyday words, one plain sentence.
+      Some ask about the mood or the moment you would put it on, some about the instruments you
+      would hear in it, some about the music it grew out of or sits beside.
 
       Rules:
-      - Genre name must not be contained in the question.
-      - Ask what the genre context actually answers.
+      - Never name the genre.
+      - Never borrow the context's wording. Say things as you would to a friend — "guitars and
+        drums", not "electric bass guitar, drum kit" — since the technical name is a word you do
+        not know.
+      - Ask only what the context answers, and still describe this genre closely enough that it is
+        the one that fits and not a neighbour.
     prompt: |
       GENRE:
       {genre}
+
+    # What each field of a generated question is for, which the model is asked to answer in and
+    # which the ground truth then carries as its columns. Renaming a field is a code change, not a
+    # change here: the CSV is read back by position.
+    fields:
+      questions: List of 5 questions.
+      id: Exact genre ID from context
+      genre: The exact name of the genre from context.
+      kind: The trait the question uses to describe the genre.
+      question: One question as the person would type it, a plain sentence in everyday words.
 
   evaluation:
     # Read by the LLMJudge evaluator pydantic-evals ships, which hands the judge the whole recorded

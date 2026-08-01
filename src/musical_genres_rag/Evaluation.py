@@ -76,14 +76,23 @@ INSTRUCTIONS = Config.getShared().getPrompt('ground_truth.instructions')
 
 PROMPT = Config.getShared().getPrompt('ground_truth.prompt')
 
+"""What one field of a generated question is for, as the model is told it.
+
+Read from the file the rest of the prompt is in, since this is prompt and not schema: the model
+is asked for a field by what it is described as, and describing it otherwise is tuning.
+"""
+def fieldDescription(field):
+    return Config.getShared().getPrompt('ground_truth.fields.{field}'.format(field = field))
+
+"""The order is the order the ground truth is written in, and it is read back by position"""
 class GenreQuestion(BaseModel):
-    id: str = Field(description = "Exact genre ID from context")
-    genre: str = Field(description = "The exact name of the genre from context.")
-    kind: Literal['vibe', 'instruments', 'related_genres'] = Field(description = "The trait the question uses to describe the genre.")
-    question: str = Field(description = "A 10-15 word question about the genre, without naming it.")
+    id: str = Field(description = fieldDescription('id'))
+    genre: str = Field(description = fieldDescription('genre'))
+    kind: Literal['vibe', 'instruments', 'related_genres'] = Field(description = fieldDescription('kind'))
+    question: str = Field(description = fieldDescription('question'))
 
 class GenreQuestions(BaseModel):
-    questions : List[GenreQuestion] = Field(description = "List of 5 questions.")
+    questions : List[GenreQuestion] = Field(description = fieldDescription('questions'))
 
 class GroundTruth:
     
