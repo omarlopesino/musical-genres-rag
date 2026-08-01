@@ -252,14 +252,24 @@ MINIMUM_LABEL = 0.08
 RUN_DATE_FORMAT = '%Y-%m-%d'
 FULL_DATE_FORMAT = '%Y-%m-%d %H:%M'
 
-# The whole summary on one line
-SUMMARY_COLUMNS = 9
+# How many tiles a row of the summary holds. Four rather than the whole summary at once: a tile cuts
+# off whatever does not fit its share of the width, and an embedding model named as the hub names it
+# is far longer than a ninth of a row.
+SUMMARY_COLUMNS = 4
 
-# st.metric draws its value at a size no parameter of its own reaches, and eight tiles across one row
-# need it small enough to fit. These are the test ids this Streamlit build gives the label and value.
+# st.metric draws its value at a size no parameter of its own reaches. These are the test ids this
+# Streamlit build gives the label and the value.
+#
+# The value wraps rather than being cut: a tile four to a row is wide enough for two lines of it,
+# which is what it takes to read a model name whole.
 SUMMARY_STYLE = '''
 <style>
-[data-testid="stMetricValue"] { font-size: 1rem; }
+[data-testid="stMetricValue"] {
+    font-size: 1rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+}
 [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] p { font-size: 0.72rem; }
 </style>
 '''
