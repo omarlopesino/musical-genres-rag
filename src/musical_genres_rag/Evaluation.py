@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from musical_genres_rag.Config import Config
-from musical_genres_rag.models import Attachment, EvaluationRun
+from musical_genres_rag.models import Attachment, EvaluationRun, Genre
 from musical_genres_rag.Progress import NULL_PROGRESS
 from musical_genres_rag.Rag import cost, EmptyRagResponse, EmptyRetrievalError, UNKNOWN_ANSWER
 from musical_genres_rag.Renderer import EntityRenderer
@@ -397,10 +397,15 @@ class GenresRagEvaluationRunner(EvaluationRunner):
                 HitDbRag(),
                 GenreRagGenreHit(),
                 GenreRagGenreMrr(),
+                GenreRagFamilyHit(),
+                GenreRagFamilyMrr(),
                 LLMJudge(rubric = JUDGE_RUBRIC, model = JUDGE_MODEL),
             ],
         )
         self._requirePrompts()
+        # Read here, where nothing is running a loop yet: the evaluators that ask for it are scored
+        # inside one, and the ORM will not open a connection from there
+        GENRE_NAMES.load()
 
     """The questions these very answers were written for, named by the file that holds them.
 
@@ -555,21 +560,93 @@ def answeredGenres(output):
 def normalizeGenre(name):
     return name.strip().casefold()
 
-"""Checks if the expected genre is named in the answer at all. Averaged over cases it is the hit rate"""
+"""What each genre answers to: its own name, and the names of the ones it sits directly under or over.
+
+Named by id rather than by the name the ground truth wrote, which is a column a bad row can hold
+anything in.
+
+Read once and held, since a run asks this of every case and the hierarchy does not move under it.
+Loaded before the run rather than on the first question asked of it: evaluators are scored inside an
+event loop, where the ORM refuses to open a connection, and pydantic-evals drops an evaluator that
+raises without recording it anywhere. An evaluator that reads the database has to arrive already fed.
+"""
+class GenreNames:
+
+    def __init__(self):
+        self.names = None
+
+    """Reads the hierarchy, from wherever there is no event loop running"""
+    def load(self):
+        self.names = self._load()
+
+    """The genre's own name, or nothing for an id no genre has"""
+    def getName(self, id):
+        return self._get(id)[0]
+
+    """Its name and those of its parents and children"""
+    def getFamily(self, id):
+        return self._get(id)[1]
+
+    def _get(self, id):
+        if self.names is None:
+            self.load()
+
+        return self.names.get(id, (None, set()))
+
+    def _load(self):
+        names = {}
+        for genre in Genre.objects.prefetch_related('parents', 'children'):
+            own = normalizeGenre(genre.getName() or '')
+            family = {own, *(
+                normalizeGenre(other.getName()) for other in
+                    [*genre.parents.all(), *genre.children.all()] if other.getName()
+            )}
+            names[genre.getId()] = (own, family)
+
+        return names
+
+GENRE_NAMES = GenreNames()
+
+"""Where in an answer one of the accepted names first appears, or nothing when none of them does"""
+def genreRank(output, accepted):
+    for rank, genre in enumerate(answeredGenres(output), start = 1):
+        if genre in accepted:
+            return rank
+
+    return None
+
+"""Checks if the expected genre itself is named in the answer. Averaged over cases it is the hit rate"""
 class GenreRagGenreHit(Evaluator):
 
     def evaluate(self, ctx: EvaluatorContext):
-        return normalizeGenre(ctx.metadata['genre']) in answeredGenres(ctx.output)
+        return genreRank(ctx.output, {GENRE_NAMES.getName(int(ctx.metadata['id']))}) is not None
 
 """Reciprocal rank of the expected genre inside the answer. Averaged over cases it is the MRR"""
 class GenreRagGenreMrr(Evaluator):
 
     def evaluate(self, ctx: EvaluatorContext):
-        genre = normalizeGenre(ctx.metadata['genre'])
-        genres = answeredGenres(ctx.output)
-        if genre not in genres:
-            return 0.0
-        return 1 / (genres.index(genre) + 1)
+        rank = genreRank(ctx.output, {GENRE_NAMES.getName(int(ctx.metadata['id']))})
+
+        return 1 / rank if rank is not None else 0.0
+
+"""The same, counting a parent or a child of the expected genre as having found it.
+
+A question describing a genre describes its family too, and the ground truth names only one of them:
+an answer saying "synth-pop" where the label says "pop" found what was asked. Scored beside the
+strict pair rather than instead of it, since this one is generous by construction and the gap between
+the two is what says how much of a miss was only ever a matter of which name got written down.
+"""
+class GenreRagFamilyHit(Evaluator):
+
+    def evaluate(self, ctx: EvaluatorContext):
+        return genreRank(ctx.output, GENRE_NAMES.getFamily(int(ctx.metadata['id']))) is not None
+
+class GenreRagFamilyMrr(Evaluator):
+
+    def evaluate(self, ctx: EvaluatorContext):
+        rank = genreRank(ctx.output, GENRE_NAMES.getFamily(int(ctx.metadata['id'])))
+
+        return 1 / rank if rank is not None else 0.0
 
 """Read by the LLMJudge evaluator pydantic-evals ships, which hands the judge the whole recorded
 output as JSON and this rubric as its only instruction.
