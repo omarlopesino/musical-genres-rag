@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Musical genres RAG</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --background: #ffffff;
+            --text: #1b1b1b;
+            --muted: #5c5c5c;
+            --border: #e2e2e2;
+            --header: #f6f6f6;
+            --link: #1a5fb4;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: #17171a;
+                --text: #ededed;
+                --muted: #a5a5a5;
+                --border: #2f2f34;
+                --header: #202024;
+                --link: #7cb0f5;
+            }
+        }
+
+        body {
+            margin: 0;
+            padding: 3rem 1.5rem;
+            background: var(--background);
+            color: var(--text);
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            line-height: 1.5;
+        }
+
+        main { max-width: 60rem; margin: 0 auto; }
+
+        h1 { font-size: 1.75rem; margin: 0 0 0.5rem; }
+
+        p { color: var(--muted); margin: 0 0 2rem; }
+
+        /* The addresses are long enough to overflow a phone, so the table scrolls on its own */
+        .services { overflow-x: auto; }
+
+        table { border-collapse: collapse; width: 100%; }
+
+        th, td {
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th { background: var(--header); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+        code { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 0.9rem; }
+
+        td.name code { font-weight: 600; }
+
+        td.address { white-space: nowrap; }
+
+        a { color: var(--link); }
+
+        .button {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.7rem 1.4rem;
+            border-radius: 0.4rem;
+            background: var(--link);
+            color: var(--background);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .button:hover { filter: brightness(1.1); }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Musical genres RAG</h1>
+        <p>Ask anything about any musical genre. These are the services it is answered by.</p>
+
+        <div class="services">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Purpose</th>
+                        <th>Local</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for service in services %}
+                        <tr>
+                            <td class="name"><code>{{ service.name }}</code></td>
+                            <td>{{ service.purpose }}</td>
+                            <td class="address"><a href="{{ service.url }}">{{ service.url }}</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a class="button" href="{{ docs }}">Read the API documentation</a>
+    </main>
+</body>
+</html>

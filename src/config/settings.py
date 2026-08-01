@@ -45,13 +45,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = []
 
-# The only page this project serves is the API documentation, which ninja renders through a template
-# of its own, so the backend is configured with nowhere of ours to look for one.
+# The pages this project serves are the root, listing the services, and the API documentation, which
+# ninja renders through a template of its own. So the only place ours are looked for is the app that
+# holds them, with no project-wide directory to keep in step with it.
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
-        'APP_DIRS': False,
+        'APP_DIRS': True,
     },
 ]
 
