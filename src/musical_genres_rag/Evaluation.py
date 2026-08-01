@@ -26,6 +26,36 @@ ID_COLUMN = 'id'
 # Everything else describes the subject, and is what a case is named after
 RESERVED_COLUMNS = (ID_COLUMN, QUESTION_COLUMN)
 
+"""How an answers file is laid out: the ground truth it answers, and the answers themselves.
+
+The ground truth is named in the file rather than looked up as the newest one, since a file answers
+the questions it was generated from and those stop being the newest the moment anybody regenerates
+them. A run pairing the two by date scores nothing and says so in no way at all.
+"""
+GROUND_TRUTH_KEY = 'ground_truth'
+RESPONSES_KEY = 'responses'
+
+"""Which columns a case is built from: how the ground truth names each one, against how an answer does.
+
+In the order the ground truth writes them, since a case is named after the traits it carries: read
+in another order the same case answers to another name, and two runs stop lining up.
+"""
+CASE_COLUMNS = {
+    ID_COLUMN: 'id',
+    'genre': 'genre',
+    'kind': 'kind',
+    QUESTION_COLUMN: 'query',
+}
+
+MISSING_GROUND_TRUTH_KEY = (
+    'The answers in "{path}" name no ground truth under "{key}", so there is no telling which '
+    'questions they answer. Run "make createAnswers ENGINE={engine}" to record one.'
+)
+
+MISSING_GROUND_TRUTH = (
+    'The answers in "{path}" name ground truth {id}, which is not registered any more.'
+)
+
 MODEL = Config.getShared().getChatModel()
 
 # How many cases are scored at once. An evaluator that calls an LLM is bound by what the provider
@@ -181,7 +211,10 @@ class GroundTruthAnswers:
             progress.advance()
 
         with open(outputPath, 'w') as jsonfile:
-            json.dump(responses, jsonfile, indent = 2)
+            json.dump({
+                GROUND_TRUTH_KEY: groundTruth.getId(),
+                RESPONSES_KEY: responses,
+            }, jsonfile, indent = 2)
 
         return [
             self.attachmentsRepository.create(
@@ -216,7 +249,11 @@ class EvaluationRunner:
         self.name = name
         self.evaluators = evaluators
         # Resolved once, so the run is stored against the very file it scored
-        self.groundTruth = requireLatestGroundTruth(attachmentsRepository)
+        self.groundTruth = self._getGroundTruth(attachmentsRepository)
+
+    """Which questions a run is scored against: the newest written, for whoever asks them live"""
+    def _getGroundTruth(self, attachmentsRepository):
+        return requireLatestGroundTruth(attachmentsRepository)
 
     """Returns the stored run, printed as it is written so a failed save still shows the report"""
     def execute(self, progress = NULL_PROGRESS):
@@ -338,7 +375,13 @@ paid for once, by "make createAnswers".
 """
 class GenresRagEvaluationRunner(EvaluationRunner):
 
+    """The answers are read before anything else: they name the ground truth this run is scored
+    against, which the base class asks for while it is building itself"""
     def __init__(self, index, attachmentsRepository, evaluationRunsRepository):
+        self.index = index
+        self.groundTruthAnswers = requireLatestGroundTruthAnswer(attachmentsRepository, index)
+        self.recordedResponses = self._loadRecordedResponses()
+
         super().__init__(
             index,
             attachmentsRepository,
@@ -357,9 +400,22 @@ class GenresRagEvaluationRunner(EvaluationRunner):
                 LLMJudge(rubric = JUDGE_RUBRIC, model = JUDGE_MODEL),
             ],
         )
-        self.groundTruthAnswers = requireLatestGroundTruthAnswer(attachmentsRepository, index)
-        self.recordedResponses = self._loadRecordedResponses()
         self._requirePrompts()
+
+    """The questions these very answers were written for, named by the file that holds them.
+
+    Not the newest set: regenerating the ground truth leaves every answers file behind, and a run
+    pairing the two by date finds no answer to any question it asks.
+    """
+    def _getGroundTruth(self, attachmentsRepository):
+        groundTruth = attachmentsRepository.load(self.groundTruthId)
+        if groundTruth is None:
+            raise RuntimeError(MISSING_GROUND_TRUTH.format(
+                id = self.groundTruthId,
+                path = self.groundTruthAnswers.getPath(),
+            ))
+
+        return groundTruth
 
     """A file written before prompts were recorded holds no context for the judge to read, and
     finding that out case by case would spend a run of paid calls to score nothing"""
@@ -376,15 +432,44 @@ class GenresRagEvaluationRunner(EvaluationRunner):
     def _getGroundTruthAnswers(self):
         return self.groundTruthAnswers
 
-    def _getResponse(self, question):
-        return next(
-            response for response in self.recordedResponses
-                if response['query'] == question
-        )
+    """Built from the answers rather than from the questions file, so a case and the response it is
+    scored on are the one row. Nothing is matched by its text, and a case whose answer is missing
+    cannot arise at all."""
+    def _generateAllCases(self):
+        return [
+            self._generateUseCase(
+                list(CASE_COLUMNS),
+                [response[key] for key in CASE_COLUMNS.values()],
+                index,
+            )
+            for index, response in enumerate(self.recordedResponses)
+        ]
 
+    def _getResponse(self, question):
+        return self.responsesByQuestion[question]
+
+    """The answers, and the id of the ground truth they answer.
+
+    An older file is a bare list of answers naming no ground truth. It is refused rather than paired
+    with whichever set happens to be newest, which is how a run comes to score nothing.
+    """
     def _loadRecordedResponses(self):
-        with open(self.groundTruthAnswers.getPath()) as file:
-            return json.load(file)
+        path = self.groundTruthAnswers.getPath()
+        with open(path) as file:
+            document = json.load(file)
+
+        if not isinstance(document, dict) or GROUND_TRUTH_KEY not in document:
+            raise RuntimeError(MISSING_GROUND_TRUTH_KEY.format(
+                path = path,
+                key = GROUND_TRUTH_KEY,
+                engine = self.index.getEngineName(),
+            ))
+
+        self.groundTruthId = document[GROUND_TRUTH_KEY]
+        responses = document[RESPONSES_KEY]
+        self.responsesByQuestion = {response['query']: response for response in responses}
+
+        return responses
 
 """Scores retrieval alone, by querying the index live.
 
