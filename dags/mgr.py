@@ -144,11 +144,13 @@ with DAG(
 
 """
 Generates ground truth.
+
+No engine, unlike the dags either side of it: the questions are written from the repository and no
+index is searched, and the one set they make is what every engine is then scored against.
 """
 with DAG(
     dag_id="ground_truth",
     dag_display_name="2. Ground truth",
-    params = DEFAULT_PARAMS,
     description="Generates ground truth for actual data",
     tags = ["musical_genres_rag"]
 ) as dag:
@@ -157,7 +159,7 @@ with DAG(
         http_conn_id=HTTP_CONN_ID,
         method="POST",
         endpoint="/ground-truth",
-        data=json.dumps({"engine": "{{ params.engine }}"}),
+        data=json.dumps({}),
         headers={"Content-Type": "application/json"},
         response_check=OperationResponseCheck,
         response_filter=lambda response: response.json()["task_id"],
