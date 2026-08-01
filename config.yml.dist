@@ -121,9 +121,13 @@ prompts:
         field holds the question that was asked and the whole context the system was allowed to use.
         Its "answer" field holds the response it produced. Ignore every other field.
 
-        The response is correct when both of these hold:
+        The response is correct when all of these hold:
         - It finds genres for the user.
-        - The answer is related directly with the question asked in the prompt.
+        - The "answer" field answers the question that was asked. Naming genres and describing what
+          each one is, leaving the reader to work out which of them answers them, is not an answer.
+          Say in the "reason" field which words of "answer" do the answering.
+        - Every entry in "genres" says why that genre answers this question. A description of what the
+          genre is in general, that would read the same under any other question, does not.
 
         Judge the response only against the context in the prompt. What you know about music is not
         evidence: an answer that is true in the world but unsupported by the context is incorrect, and
