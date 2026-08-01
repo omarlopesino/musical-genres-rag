@@ -157,6 +157,9 @@ LEADING_COLUMNS = ['metadata.question', 'output.answer.answer', 'LLMJudge', 'LLM
 # The judge is the only evaluator that explains itself, and the explanation is the point of it
 REASONED_EVALUATORS = ['LLMJudge']
 
+# What the judge scored, which only a rag run has and is what the summary reads it back as
+JUDGE_ASSERTION = 'LLMJudge'
+
 # Held narrow, or the long prose takes the width from everything the case scored
 NARROW_COLUMNS = ['metadata.question', 'output.answer.answer', 'LLMJudge reason']
 
@@ -342,6 +345,11 @@ def formatCount(count):
 # Nothing here is averaged: what a run reports is what it stored.
 def averageScore(run, name):
     return (run.getAverages() or {}).get('scores', {}).get(name)
+
+
+# The rate one boolean evaluator scored, or nothing where the run never ran it
+def assertionRate(run, name):
+    return ((run.getAverages() or {}).get(ASSERTION_RATES) or {}).get(name)
 
 
 # Where a rag run's answers ended up, as stored. Nothing for a retrieval run, which scores no outcome
@@ -575,9 +583,23 @@ def renderSummary(run):
         ('k', run.k),
         ('Embedding model', run.embedding_model),
         ('Date', run.created_at.strftime(RUN_DATE_FORMAT), run.created_at.strftime(FULL_DATE_FORMAT)),
-        ('Hit rate', formatScore(run.hit_rate), 'How often the expected genre was retrieved at all'),
-        ('MRR', formatScore(run.mrr), 'Mean reciprocal rank of the expected genre among the retrieved'),
     ]
+
+    # What retrieval was worth is what a retrieval run is for, and a rag run reads it off its own
+    # gauges. Repeating it here said the same number twice and left no room for what a rag run is
+    # scored on, which is what a judge made of the answers.
+    judged = assertionRate(run, JUDGE_ASSERTION)
+    if judged is not None:
+        summary.append((
+            'Judged correct',
+            formatShare(judged),
+            'Share of answers the judge read back as correct against the context they were written from',
+        ))
+    else:
+        summary.extend([
+            ('Hit rate', formatScore(run.hit_rate), 'How often the expected genre was retrieved at all'),
+            ('MRR', formatScore(run.mrr), 'Mean reciprocal rank of the expected genre among the retrieved'),
+        ])
 
     # Only a run that generates an answer takes time doing it, so a retrieval run shows no tile
     # rather than a dash where a number never existed
