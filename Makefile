@@ -2,7 +2,7 @@ empty :=
 space := $(empty) $(empty)
 .RECIPEPREFIX := $(space)
 
-.PHONY: setup build start stop drop psql migrate seed config directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers
+.PHONY: setup build start stop drop psql migrate seed config directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers demo demoExport
 
 DB_NAME = musical_genres
 MANAGE = uv run python manage.py
@@ -82,3 +82,12 @@ evaluateRetrieval:
 
 createAnswers:
     $(MANAGE) createAnswers $(ENGINE_ARG)
+
+# The committed evaluations, read into a fresh database so the dashboard has an evaluation of each
+# kind to show without a single paid call. What "0. Demo data" runs in Airflow.
+demo:
+    $(MANAGE) demo
+
+# Rewrites what that loads from the latest runs stored here. Run it after a retune, and commit.
+demoExport:
+    $(MANAGE) exportDemo
