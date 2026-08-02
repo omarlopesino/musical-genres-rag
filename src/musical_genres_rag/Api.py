@@ -15,6 +15,7 @@ from musical_genres_rag.services import (
     ENGINES,
     INDEX_ENGINE,
     buildAttachmentsRepository,
+    buildDemoLoad,
     buildFeedbackRelevanceJudge,
     buildGenresGroundTruth,
     buildGenresIndex,
@@ -45,6 +46,7 @@ CREATE_ANSWERS = 'create-answers'
 EVALUATE_RAG = 'evaluate-rag'
 EVALUATE_RETRIEVAL = 'evaluate-retrieval'
 FEEDBACK_JUDGE = 'feedback-judge'
+DEMO = 'demo'
 
 # Where the files those operations write are downloaded from, one id per registered attachment
 ATTACHMENTS_PATH = '/attachments'
@@ -105,6 +107,16 @@ FEEDBACK_JUDGE_FAILURE = {
     'success': False,
     'info': 'There was an error judging the feedback. Please read the app log in the server for more details.',
     'link': None,
+}
+
+"""The only operation that writes rows nobody paid for. It links nowhere for the same reason the
+ingest does: it wrote no file, and what it loaded is read where every run is read."""
+DEMO_SUCCESS = 'The demo evaluations have been loaded successfully.'
+DEMO_ALREADY = 'The demo evaluations were already loaded, so nothing was loaded again.'
+DEMO_FAILURE = {
+    'loaded': 0,
+    'success': False,
+    'info': 'There was an error loading the demo data. Please run make demo in the server for more details.',
 }
 
 BUSY = 'Another {operation} is already running as task "{task}". Wait for it to finish before starting this one.'
@@ -195,6 +207,10 @@ def evaluateRetrieval(request, payload: EngineRequest):
 @api.post('/feedback-judge', response = STARTED, summary = 'Score the answers people left feedback on')
 def feedbackJudge(request, payload: JudgeRequest):
     return dispatch(FEEDBACK_JUDGE, payload, judging(payload.limit), FEEDBACK_JUDGE_FAILURE)
+
+@api.post('/demo', response = STARTED, summary = 'Load the committed demo evaluations')
+def demo(request, payload: TaskRequest):
+    return dispatch(DEMO, payload, loading(), DEMO_FAILURE)
 
 """How far a task got, and what it left behind once it is done.
 
@@ -340,6 +356,25 @@ def evaluating(runner, engine, info):
         run = runner(engine).execute(progress)
 
         return {'success': True, 'info': info, 'link': reportUrl(run.id, settings.UI_BASE_URL)}
+
+    return work
+
+"""Loads the evaluations committed to this repository, so whoever is only here to read them reads
+them without running the pipeline that would otherwise have to pay for them first.
+
+Takes no engine: the runs were scored where they were exported from, and nothing is searched to read
+one back. A second call loads nothing rather than a second copy, and says so — that is an outcome
+and not a refusal, so this is triggered as often as anybody likes.
+"""
+def loading():
+    def work(progress):
+        [loaded, alreadyThere] = buildDemoLoad().load(progress)
+
+        return {
+            'loaded': loaded,
+            'success': True,
+            'info': DEMO_ALREADY if alreadyThere else DEMO_SUCCESS,
+        }
 
     return work
 
