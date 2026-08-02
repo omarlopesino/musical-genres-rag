@@ -5,6 +5,7 @@ from musical_genres_rag.Feedback import FeedbackRelevanceJudge
 from musical_genres_rag.Index import Index, PostgresSearchEngine
 from musical_genres_rag.Rag import GenresRag
 from musical_genres_rag.Repository import AttachmentsRepository, ConversationsRepository, EvaluationRunsRepository, FeedbackRepository, GenresRepository, JudgeBatchRepository
+from musical_genres_rag.Sample import TrafficSampler
 from musical_genres_rag.Vectorizer import VectorizerDownload
 
 GENRE_INDEX_TABLE = 'genre_index'
@@ -85,6 +86,13 @@ def buildGenresRetrievalEvaluationRunner(engine = INDEX_ENGINE):
 
 def buildGroundTruthAnswers(engine = INDEX_ENGINE):
     return GroundTruthAnswers(buildGenresRag(engine), buildAttachmentsRepository())
+
+def buildTrafficSampler():
+    return TrafficSampler(
+        buildConversationsRepository(),
+        buildFeedbackRepository(),
+        buildJudgeBatchRepository(),
+    )
 
 def buildDemoExport():
     return DemoExport(buildEvaluationRunsRepository(), buildAttachmentsRepository())
