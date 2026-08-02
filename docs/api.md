@@ -24,6 +24,7 @@ task it is followed by; what the work produced is read afterwards from `/progres
 | `POST` | `/evaluate-retrieval` | `engine`, `task_id` | Scores the index alone, live, with no LLM call |
 | `POST` | `/feedback-judge` | `limit`, `task_id` | Scores the answers people left feedback on, one call each |
 | `POST` | `/demo` | `task_id` | Loads the evaluations committed to the repository, spending nothing |
+| `POST` | `/sample` | `seconds`, `conversations`, `feedback`, `task_id` | Writes artificial traffic for the dashboard, spending nothing |
 | `GET` | `/progress/{task_id}` | — | Says how far a task got, and what it left behind |
 | `GET` | `/attachments/{id}` | — | Downloads a file the ground truth or the answers wrote |
 
@@ -34,7 +35,10 @@ Both body fields are optional, and a body of `{}` is a valid request:
   the same list `--engine` takes on the command line. `/ground-truth` takes none, because the
   questions come straight from the repository and no index is searched; neither does
   `/feedback-judge`, which reads an answer back against the context the feedback row already
-  carries, nor `/demo`, which reads back runs that were scored somewhere else entirely.
+  carries, nor `/demo` and `/sample`, which read back what was answered somewhere else entirely.
+- `seconds`, `conversations` and `feedback`, on `/sample` alone, are how much traffic to write and
+  over how long: 30 seconds, 20 conversations and 60 of every hundred of them rated, by default. The
+  window is real seconds and the run takes them, because rows written in one instant draw no line.
 - `task_id` is the caller's own name for the run, so it knows where to poll before the POST returns.
   Anything matching `[A-Za-z0-9._-]{1,128}`; one is invented when it is left out.
 - `limit`, on `/feedback-judge` alone, is how many answers that run may read, 100 by default. Every
@@ -67,8 +71,8 @@ curl localhost:8000/progress/20260729T101500-ingest
 ```
 
 `phase` is what the run is spending its time on — `queued`, `indexing`, `generating`, `answering`,
-`scoring`, `judging`, `saving`, `loading`. `total` and `percent` are null until whatever is being
-counted is known.
+`scoring`, `judging`, `saving`, `loading`, `sampling`. `total` and `percent` are null until whatever
+is being counted is known.
 
 Once `done`, `result` carries what the operation was asked to report:
 
@@ -80,6 +84,7 @@ Once `done`, `result` carries what the operation was asked to report:
 | evaluate-rag, evaluate-retrieval | `{"success": true, "info": "...", "link": "http://localhost:8501/report?run=21"}` |
 | feedback-judge | `{"total": 3, "success": true, "info": "...", "link": "http://localhost:8501/feedback?batch=7"}` |
 | demo | `{"loaded": 2, "success": true, "info": "The demo evaluations have been loaded successfully."}` |
+| sample | `{"conversations": 20, "feedback": 12, "success": true, "info": "...", "link": "http://localhost:8501/feedback?batch=9"}` |
 
 `feedback-judge` writes its verdicts onto the feedback rows it read, and opens a judge batch naming
 that run so those rows are read back together: `total` is how many it judged and `link` is the
@@ -91,6 +96,13 @@ the Streamlit app, the same one its list of runs links to, and for `feedback-jud
 on the same app. For `ground-truth` and `create-answers` it is the file itself, downloaded from this
 API, and null when the run failed and wrote none. `ingest` and `demo` carry none at all: neither
 wrote a file, and what they left is read where it always is.
+
+`sample` replays the answers committed with the demo as conversations, spread over the window it was
+given, and rates only `feedback` of every hundred of them: an answer nobody pressed a thumb on is the
+ordinary case, and the ratings covering less than the conversations is what the dashboard is meant to
+show. It opens a judge batch like `feedback-judge` does and links to it, so a run's ratings are read
+back together. The verdicts it writes are made up rather than judged, which is also what keeps
+`feedback-judge` from reading those rows back and paying to score them again.
 
 `demo` reads the evaluations committed to this repository into the database, so the reports are
 worth opening on a clone nobody has run the pipeline on. It is the one operation that spends
