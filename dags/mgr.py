@@ -108,6 +108,48 @@ def TotalFinishedCheck(response, task_instance):
     return True
 
 """
+Loads the evaluations committed to the repository.
+
+Numbered before the ingest because it is what somebody reading this project runs first: every dag
+below spends a paid call per question, and this one spends none at all. It leaves the dashboard with
+an evaluation of each kind to read, and the rest of the pipeline still to be run by whoever wants to
+score it themselves.
+
+No engine and no button: nothing is searched to load a run that was scored already, and no file is
+written to download. Running it twice loads nothing the second time.
+"""
+with DAG(
+    dag_id="demo",
+    dag_display_name="0. Demo data",
+    description="Loads the committed demo evaluations, with no paid call",
+    tags = ["musical_genres_rag"]
+) as dag:
+    demo = HttpOperator(
+        task_id="demo",
+        http_conn_id=HTTP_CONN_ID,
+        method="POST",
+        endpoint="/demo",
+        data=json.dumps({}),
+        headers={"Content-Type": "application/json"},
+        response_check=OperationResponseCheck,
+        response_filter=lambda response: response.json()["task_id"],
+        dag=dag,
+    )
+
+    progress = HttpSensor(
+        task_id="demo_finished",
+        method="GET",
+        http_conn_id=HTTP_CONN_ID,
+        endpoint="/progress/{{ ti.xcom_pull(task_ids='demo') }}",
+        request_params={},
+        response_check=ProgressFinishedCheck,
+        poke_interval=5,
+        dag=dag,
+    )
+
+    demo >> progress
+
+"""
 Index all musical genres data.
 """
 with DAG(
