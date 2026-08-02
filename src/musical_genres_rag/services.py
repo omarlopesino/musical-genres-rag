@@ -1,4 +1,5 @@
 from musical_genres_rag.Config import Config
+from musical_genres_rag.Demo import DemoExport, DemoLoad
 from musical_genres_rag.Evaluation import GenreQuestionsGroundTruth, GenresRagEvaluationRunner, GenresRetrievalEvaluationRunner, GroundTruthAnswers
 from musical_genres_rag.Feedback import FeedbackRelevanceJudge
 from musical_genres_rag.Index import Index, PostgresSearchEngine
@@ -84,6 +85,12 @@ def buildGenresRetrievalEvaluationRunner(engine = INDEX_ENGINE):
 
 def buildGroundTruthAnswers(engine = INDEX_ENGINE):
     return GroundTruthAnswers(buildGenresRag(engine), buildAttachmentsRepository())
+
+def buildDemoExport():
+    return DemoExport(buildEvaluationRunsRepository(), buildAttachmentsRepository())
+
+def buildDemoLoad():
+    return DemoLoad(buildEvaluationRunsRepository(), buildAttachmentsRepository())
 
 def buildVectorizerDownload():
     return VectorizerDownload()
