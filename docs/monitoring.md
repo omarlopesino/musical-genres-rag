@@ -34,6 +34,30 @@ Two things a reader trips on otherwise:
   judged either, so the relevance and thumbs panels cover rated answers rather than all traffic.
   The conversation panels beside them cover everything.
 
+## Traffic to draw
+
+Both tables only fill up when somebody sits in the chat, a paid call per question, so on a fresh
+clone every panel above is empty. `make sample` — or the **7. Sample traffic** dag — writes some
+instead, replaying the answers committed under `data/demo` as conversations and rating some of them.
+It costs nothing, and it takes the window it is spread over on purpose: rows written in one instant
+share a timestamp and draw no line.
+
+Two things to know while doing it:
+
+- **Set the range to the last 15 minutes.** The default is 7 days, and `$__timeGroup` sizes its
+  buckets from the range, so half a minute of traffic lands in a single bucket: token usage becomes
+  one point and cost one bar. The default is right for real traffic and wrong for watching this
+  arrive. Remember the dashboard refreshes every 30 seconds, so a run of that length may take a
+  cycle to show up.
+- **A sampled conversation carries `sampled` in its `answer`.** Nothing here reads it — every panel
+  reads `answer->'answer'->>'answer'` and no more — so it changes nothing and still tells the made-up
+  rows from the real ones. `delete from feedback where conversation_id in (select id from
+  conversation where answer ? 'sampled')`, then the same over `conversation`, takes them all back
+  out.
+
+The verdicts a sampling run leaves are made up rather than judged, which is why nothing is spent and
+why **6. Feedback judge** will not read those rows back: it looks for feedback with no judgement.
+
 ## Where it comes from
 
 Provisioned out of this repository rather than built by hand in the UI, so a fresh volume comes up
