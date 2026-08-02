@@ -2,7 +2,7 @@ empty :=
 space := $(empty) $(empty)
 .RECIPEPREFIX := $(space)
 
-.PHONY: setup build start stop drop psql migrate seed config directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers demo demoExport
+.PHONY: setup build start stop drop psql migrate seed config directories downloadModel ingest rag groundtruth evaluate evaluateRetrieval createAnswers demo demoExport sample
 
 DB_NAME = musical_genres
 MANAGE = uv run python manage.py
@@ -13,6 +13,14 @@ GROUND_TRUTH_DIRECTORY = tests/ground_truth
 # postgres_hybrid. Left unset, each command uses its own default.
 ENGINE ?=
 ENGINE_ARG = $(if $(ENGINE),--engine $(ENGINE))
+
+# How much traffic "make sample" writes and over how long, as in "make sample SECONDS=60
+# CONVERSATIONS=40 FEEDBACK=80". FEEDBACK is out of a hundred: how many of them somebody rated.
+# Left unset, the command's own defaults decide.
+SECONDS ?=
+CONVERSATIONS ?=
+FEEDBACK ?=
+SAMPLE_ARGS = $(if $(SECONDS),--seconds $(SECONDS)) $(if $(CONVERSATIONS),--conversations $(CONVERSATIONS)) $(if $(FEEDBACK),--feedback $(FEEDBACK))
 
 setup:
     uv sync
@@ -91,3 +99,8 @@ demo:
 # Rewrites what that loads from the latest runs stored here. Run it after a retune, and commit.
 demoExport:
     $(MANAGE) exportDemo
+
+# Artificial traffic for the Grafana dashboard, replayed from the committed answers and so free.
+# Takes about SECONDS to run, on purpose: rows written in one instant draw no line.
+sample:
+    $(MANAGE) sample $(SAMPLE_ARGS)
