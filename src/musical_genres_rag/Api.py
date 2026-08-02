@@ -11,6 +11,7 @@ from pydantic import Field
 from musical_genres_rag.Feedback import DEFAULT_LIMIT
 from musical_genres_rag.Progress import CacheProgress, readProgress
 from musical_genres_rag.Report import batchFeedbackUrl, reportUrl
+from musical_genres_rag.Sample import DEFAULT_CONVERSATIONS, DEFAULT_FEEDBACK, DEFAULT_SECONDS
 from musical_genres_rag.services import (
     ENGINES,
     INDEX_ENGINE,
@@ -22,6 +23,7 @@ from musical_genres_rag.services import (
     buildGenresRagEvaluationRunner,
     buildGenresRetrievalEvaluationRunner,
     buildGroundTruthAnswers,
+    buildTrafficSampler,
 )
 from musical_genres_rag.Task import BackgroundTasks, OperationLock
 
@@ -47,6 +49,7 @@ EVALUATE_RAG = 'evaluate-rag'
 EVALUATE_RETRIEVAL = 'evaluate-retrieval'
 FEEDBACK_JUDGE = 'feedback-judge'
 DEMO = 'demo'
+SAMPLE = 'sample'
 
 # Where the files those operations write are downloaded from, one id per registered attachment
 ATTACHMENTS_PATH = '/attachments'
@@ -119,6 +122,17 @@ DEMO_FAILURE = {
     'info': 'There was an error loading the demo data. Please run make demo in the server for more details.',
 }
 
+"""The other operation nobody pays for. It writes the traffic the dashboard is drawn over, so what
+it reports is how much of it arrived and how much of that anybody rated."""
+SAMPLE_SUCCESS = 'The sampled traffic has been written successfully.'
+SAMPLE_FAILURE = {
+    'conversations': 0,
+    'feedback': 0,
+    'success': False,
+    'info': 'There was an error sampling traffic. Please run make sample in the server for more details.',
+    'link': None,
+}
+
 BUSY = 'Another {operation} is already running as task "{task}". Wait for it to finish before starting this one.'
 UNKNOWN = 'No task "{task}" was ever started here, or it is old enough to have been forgotten.'
 
@@ -146,6 +160,13 @@ class EngineRequest(TaskRequest):
 on a schedule bounds what a run costs rather than letting it read whatever has piled up."""
 class JudgeRequest(TaskRequest):
     limit: int = Field(default = DEFAULT_LIMIT, ge = 1)
+
+"""How much traffic to write, and over how long. The window is real seconds, and the run takes them:
+rows sharing an instant draw no line, so they are written as they are meant to have arrived."""
+class SampleRequest(TaskRequest):
+    seconds: int = Field(default = DEFAULT_SECONDS, ge = 1, le = 3600)
+    conversations: int = Field(default = DEFAULT_CONVERSATIONS, ge = 1, le = 1000)
+    feedback: int = Field(default = DEFAULT_FEEDBACK, ge = 0, le = 100)
 
 class Accepted(Schema):
     task_id: str
@@ -211,6 +232,15 @@ def feedbackJudge(request, payload: JudgeRequest):
 @api.post('/demo', response = STARTED, summary = 'Load the committed demo evaluations')
 def demo(request, payload: TaskRequest):
     return dispatch(DEMO, payload, loading(), DEMO_FAILURE)
+
+@api.post('/sample', response = STARTED, summary = 'Write artificial traffic for the dashboard')
+def sample(request, payload: SampleRequest):
+    return dispatch(
+        SAMPLE,
+        payload,
+        sampling(payload.seconds, payload.conversations, payload.feedback),
+        SAMPLE_FAILURE,
+    )
 
 """How far a task got, and what it left behind once it is done.
 
@@ -374,6 +404,33 @@ def loading():
             'loaded': loaded,
             'success': True,
             'info': DEMO_ALREADY if alreadyThere else DEMO_SUCCESS,
+        }
+
+    return work
+
+"""Replays the committed answers as conversations, and rates some of them, so the dashboard drawn
+over live traffic has traffic to draw.
+
+Takes no engine and spends nothing: every answer it writes down was answered somewhere else and paid
+for then. The run lasts the window it was given, because a row dates itself as it is written and a
+graph is drawn from rows that do not share an instant.
+
+Only some of them are rated, which is what makes the picture the real one: an answer nobody pressed
+a thumb on is the ordinary case, and the panels over the ratings covering less than the panels over
+the conversations is the thing being shown.
+
+The link is the batch's own page, narrowed to the ratings this run left, exactly as the judge's is.
+"""
+def sampling(seconds, conversations, feedback):
+    def work(progress):
+        [batch, written, rated] = buildTrafficSampler().sample(progress, seconds, conversations, feedback)
+
+        return {
+            'conversations': written,
+            'feedback': rated,
+            'success': True,
+            'info': SAMPLE_SUCCESS,
+            'link': batchFeedbackUrl(batch.getId(), settings.UI_BASE_URL),
         }
 
     return work
