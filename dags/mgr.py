@@ -35,6 +35,30 @@ JUDGE_PARAMS = {
     )
 }
 
+"""What the sampler is run with. It searches no index and answers nothing: it replays answers that
+were paid for once, so what it is told is how much traffic to write and over how long to spread it.
+The window is real seconds and the run takes them, because rows sharing an instant draw no line."""
+SAMPLE_PARAMS = {
+    "seconds": Param(
+        30,
+        type = "integer",
+        minimum = 1,
+        maximum = 3600
+    ),
+    "conversations": Param(
+        20,
+        type = "integer",
+        minimum = 1,
+        maximum = 1000
+    ),
+    "feedback": Param(
+        60,
+        type = "integer",
+        minimum = 0,
+        maximum = 100
+    )
+}
+
 # Any moment already past will do: nothing is caught up on, so this only says the schedule has begun
 SCHEDULE_START = datetime(2026, 1, 1)
 
@@ -374,3 +398,52 @@ with DAG(
     )
 
     feedback_judge >> progress
+
+"""
+Writes artificial traffic, so the dashboard over live traffic has some.
+
+Grafana draws the conversations people have had and what they made of the answers, and both only
+fill up a question at a time at the price of a call each. This replays the answers committed with
+the demo instead, spending nothing, and rates only some of them: an answer nobody pressed a thumb on
+is the ordinary case, and the panels over the ratings covering less than the panels over the
+conversations is the very thing worth seeing.
+
+Triggered by hand rather than scheduled, so nothing writes made-up rows unattended. Trigger it again
+to watch the panels step up.
+"""
+with DAG(
+    dag_id="sample",
+    dag_display_name="7. Sample traffic",
+    params = SAMPLE_PARAMS,
+    description="Writes artificial conversations and feedback, with no paid call",
+    tags = ["musical_genres_rag"]
+) as dag:
+    sample = HttpOperator(
+        task_id="sample",
+        http_conn_id=HTTP_CONN_ID,
+        method="POST",
+        endpoint="/sample",
+        data=json.dumps({
+            "seconds": "{{ params.seconds }}",
+            "conversations": "{{ params.conversations }}",
+            "feedback": "{{ params.feedback }}",
+        }),
+        headers={"Content-Type": "application/json"},
+        response_check=OperationResponseCheck,
+        response_filter=lambda response: response.json()["task_id"],
+        dag=dag,
+    )
+
+    progress = LinkedHttpSensor(
+        task_id="sample_finished",
+        link_name="Feedback",
+        method="GET",
+        http_conn_id=HTTP_CONN_ID,
+        endpoint="/progress/{{ ti.xcom_pull(task_ids='sample') }}",
+        request_params={},
+        response_check=AttachmentFinishedCheck,
+        poke_interval=5,
+        dag=dag,
+    )
+
+    sample >> progress
