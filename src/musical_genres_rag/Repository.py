@@ -1,5 +1,6 @@
 from django.db.models import Avg, Count, Sum
 
+from musical_genres_rag.Demo import DEMO_DIRECTORY
 from musical_genres_rag.models import Attachment, Conversation, EvaluationRun, Feedback, Genre, Instrument, JudgeBatch
 
 class RepositoryBase():
@@ -25,6 +26,20 @@ class RepositoryBase():
 
         return [byId[id] for id in ids if id in byId]
 
+    """Dates a row as of when it was really written, for one being restored rather than made here.
+
+    Written as an update because the column dates itself the moment it is inserted, and nothing
+    passed to create() is looked at at all.
+    """
+    def _restore(self, entity, field, moment):
+        if moment is None:
+            return entity
+
+        self.model.objects.filter(pk = entity.pk).update(**{field: moment})
+        setattr(entity, field, moment)
+
+        return entity
+
 class InstrumentsRepository(RepositoryBase):
 
     def __init__(self):
@@ -42,8 +57,16 @@ class AttachmentsRepository(RepositoryBase):
     def getLatestGroundTruthResponses(self, engine):
         return self._getLatest(Attachment.Type.GROUND_TRUTH_ANSWERS, engine)
 
-    def create(self, path, type, engine = None):
-        return self.model.objects.create(path = path, type = type, engine = engine)
+    """Registers a generated file. "created" is for one being restored rather than written now, and
+    is set afterwards because the column fills itself in."""
+    def create(self, path, type, engine = None, created = None):
+        attachment = self.model.objects.create(path = path, type = type, engine = engine)
+
+        return self._restore(attachment, 'created', created)
+
+    """Whether the committed demo files are registered, which is what makes loading them twice a no-op"""
+    def hasDemo(self):
+        return self.model.objects.filter(path__startswith = DEMO_DIRECTORY).exists()
 
     """Ties break on id so two files written inside the same second still order deterministically"""
     def _getLatest(self, type, engine = None):
@@ -57,9 +80,13 @@ class EvaluationRunsRepository(RepositoryBase):
     def __init__(self):
         super().__init__(EvaluationRun)
 
-    """The attachments are kept as relations so a run always names the exact files it scored"""
-    def create(self, type, groundTruth, groundTruthAnswers, retriever, k, embeddingModel, hitRate, mrr, report, averages):
-        return self.model.objects.create(
+    """The attachments are kept as relations so a run always names the exact files it scored.
+
+    "created" is for a run being restored rather than scored now, and is set afterwards for the
+    same reason the attachments above are.
+    """
+    def create(self, type, groundTruth, groundTruthAnswers, retriever, k, embeddingModel, hitRate, mrr, report, averages, created = None):
+        run = self.model.objects.create(
             type = type,
             ground_truth = groundTruth,
             ground_truth_answers = groundTruthAnswers,
@@ -71,6 +98,8 @@ class EvaluationRunsRepository(RepositoryBase):
             report = report,
             averages = averages,
         )
+
+        return self._restore(run, 'created_at', created)
 
     """The runs a filter asks for. An empty filter is no filter, so the page opens on everything"""
     def findFiltered(self, types = None, retrievers = None, embeddingModels = None, since = None, until = None):
