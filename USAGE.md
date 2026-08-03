@@ -108,7 +108,7 @@ Feedback stores the likes and dislikes of users. Also, this data is used to perf
 
 Go to grafana. Then select dashboards and choose 'Conversations'. YOu will see a variety of stats:
 
-[Grafana](images/grafana.png)
+![Grafana](images/grafana.png)
 
 Some examples of the stats are:
 * Total of conversations
