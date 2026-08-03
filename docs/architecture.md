@@ -1,5 +1,7 @@
 # Class diagram
 
+**AI transparency**: This document is AI generated.
+
 Classes under `src/musical_genres_rag`.
 
 Persistence is Django's: `models.py` holds the ORM models, connections come from

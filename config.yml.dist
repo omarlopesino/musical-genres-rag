@@ -1,31 +1,23 @@
-# Everything that decides how this RAG behaves, so tuning it is editing this rather than editing
-# Python. Copied to config.yml by "make config", which never overwrites one already there: the copy
-# is yours to edit and is not committed.
-#
-# No secret belongs here. The one this project has, OPENAI_API_KEY, stays in .env.
+# Main configuration of the RAG. Modify this file
+# to tune the prompt, choose the models of your preference (OpenAI), and select the index engine.
 
-# Which search engine everything runs through: one of the names services.ENGINES lists, so
-# postgres_text, postgres_embed or postgres_hybrid. "--engine" on a command and "engine" in an API
-# request still override it for a single run.
+# Select the index engine you will use. There are three options available:
+# - postgres_text: Index the text raw to search the content using BM25 keyword search.
+# - postgres_embed: Content is saved as vectors to allow find more semantic results.
+# - postgres_hybrid: Combines embed and text results using an Recyprocal-Rank Fusion algorithm.
 index_engine: postgres_hybrid
 
 models:
-  # Writes every answer, generates the ground truth and judges both. The prices a cost is worked out
-  # from live in Rag.py and are not read from here, so changing this leaves them behind.
+  # Main model used in the application.
   chat: gpt-5.4-mini
 
-  # The embedding model, as it is named on the hub. "make downloadModel" fetches this one, the vector
-  # engines read it, and an evaluation records it under this name. A model returning a vector of a
-  # different width also needs the index column redeclared, which is a migration.
+  # The embedding model. It must be a embedding model from huggingface, compatible with onxx.
   embedding: Xenova/bge-small-en-v1.5
 
-# What is said to the model, and how what it is asked about is laid out for it.
-#
-# The braces below are what format() fills in, so every prompt must keep the ones it is given and no
-# others: a brace meaning itself breaks the call that fills the prompt in.
+# All the prompts used in the application.
 prompts:
 
-  # The chat: what answers a question out of what the index retrieved.
+  # Used to provide answers in the chat.
   rag:
     # Must keep telling the model to answer exactly "I don't know.". That phrase is matched in code
     # as Rag.UNKNOWN_ANSWER, and the judge rubric below is written around it.
@@ -59,8 +51,7 @@ prompts:
       CONTEXT:
       {context}
 
-    # What each field of an answer is for. Each is written towards what was asked and never about the
-    # asking: the user wants to be told about the music, not shown the reasoning that reached it.
+    # The description of each structured response field.
     fields:
       answer: |
         2-4 sentences answering the user's question. Say what the answer is and name the genre it
@@ -81,12 +72,7 @@ prompts:
         2 sentences telling the user about this instrument, saying what it does in the music they
         asked about. Explain it, do not argue for it, and never mention the context.
 
-  # The questions an evaluation is scored against, written from each genre by the same model.
-  #
-  # The wording rule is the one that matters. Written from the genre it asks about, a model reuses
-  # that genre's own words, and a question quoting the document is found by matching words alone:
-  # the text engine scores what it always would and the vector engines are measured on the one thing
-  # they are not for. Nobody searching has the document in front of them, so neither should this.
+  # Instructs llm to generate questions for evaluations, trying to be as real as possible.
   ground_truth:
     instructions: |
       You are a regular person asking a music chatbot for help. You are not a musician and you know
@@ -110,9 +96,6 @@ prompts:
       GENRE:
       {genre}
 
-    # What each field of a generated question is for, which the model is asked to answer in and
-    # which the ground truth then carries as its columns. Renaming a field is a code change, not a
-    # change here: the CSV is read back by position.
     fields:
       questions: List of 5 questions.
       id: Exact genre ID from context
@@ -121,10 +104,8 @@ prompts:
       question: One question as the person would type it, a plain sentence in everyday words.
 
   evaluation:
-    # Read by the LLMJudge evaluator pydantic-evals ships, which hands the judge the whole recorded
-    # output as JSON and this rubric as its only instruction, which is why the rubric names the
-    # fields to read rather than being told about them.
     judge:
+      # Rubric used to evaluate the rag is responding okay.
       rubric: |
         The output is a JSON object recording one answer of a musical genre RAG system. Its "prompt"
         field holds the question that was asked and the whole context the system was allowed to use.
@@ -156,9 +137,7 @@ prompts:
         The question is vague on purpose and never names the genre it describes. Vague is not
         incorrect: judge whether the response found what the question described.
 
-  # The judge that reads back an answer somebody already pressed a thumb on. The thumb is
-  # deliberately kept out of it: two verdicts are only worth comparing while neither was told what
-  # the other said.
+  # Order ai to verify a user answer.
   feedback:
     instructions: |
       You are judging how well an answer served the question it was given for.

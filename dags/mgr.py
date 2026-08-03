@@ -15,7 +15,7 @@ HTTP_CONN_ID = "musical_genres_rag"
 # none of the project, so this list is kept in step with services.ENGINES by hand.
 DEFAULT_PARAMS = {
     "engine": Param(
-        "postgres_text",
+        "postgres_hybrid",
         enum = [
             "postgres_text",
             "postgres_embed",

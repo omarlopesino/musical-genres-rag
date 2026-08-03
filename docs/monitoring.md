@@ -1,5 +1,7 @@
 # Monitoring
 
+**AI transparency**: This document is AI generated.
+
 What the system is doing while it runs, rather than what it did in any one evaluation. The Streamlit
 pages answer a question at a time — this conversation, that batch of feedback — and Grafana answers
 the one they cannot: how any of it is moving. Whether answers are getting slower, what a week of

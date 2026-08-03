@@ -1,5 +1,7 @@
 # The JSON API
 
+**AI transparency**: This document is AI generated.
+
 What an orchestrator runs this project by: building the index, writing the questions to ask it,
 answering them and scoring those answers. Each endpoint runs the project's own code for it, the same
 code the equivalent command runs, so there is one way of ingesting and one way of evaluating however
