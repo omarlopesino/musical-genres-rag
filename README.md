@@ -30,7 +30,7 @@ We just have a sample and not the entire database for two reason:
 
 ## Usage
 
-Read [USAGE.md] to know how to use it.
+Read [USAGE](./USAGE.md) to know how to use it.
 
 ## Stack
 
