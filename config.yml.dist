@@ -7,7 +7,7 @@
 # Which search engine everything runs through: one of the names services.ENGINES lists, so
 # postgres_text, postgres_embed or postgres_hybrid. "--engine" on a command and "engine" in an API
 # request still override it for a single run.
-index_engine: postgres_text
+index_engine: postgres_hybrid
 
 models:
   # Writes every answer, generates the ground truth and judges both. The prices a cost is worked out
